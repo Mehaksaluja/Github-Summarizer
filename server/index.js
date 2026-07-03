@@ -6,19 +6,35 @@ import MongoStore from "connect-mongo";
 import passport from "./config/passport.js";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.js";
+import webhookRoutes from "./routes/webhook.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB
 connectDB();
 
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
-app.use(express.json());
 
-// Session — stored in MongoDB so sessions survive server restarts
+// Read raw body once from stream — needed for GitHub webhook signature verification
+app.use((req, res, next) => {
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    if (chunks.length > 0) {
+      req.rawBody = Buffer.concat(chunks);
+      try {
+        req.body = JSON.parse(req.rawBody.toString());
+      } catch {
+        req.body = {};
+      }
+    }
+    next();
+  });
+  req.on("error", next);
+});
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
@@ -26,7 +42,7 @@ app.use(
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI + "github_summary" }),
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      maxAge: 1000 * 60 * 60 * 24 * 7,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
     },
@@ -36,8 +52,8 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Routes
 app.use("/auth", authRoutes);
+app.use("/webhooks", webhookRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
