@@ -1,25 +1,23 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Folder } from "lucide-react";
+import { ArrowLeft, FolderGit2 } from "lucide-react";
 import { fetchSummaries } from "../api/summaries";
+import TopBar from "../components/TopBar";
 import SummaryCard from "../components/SummaryCard";
+
+const LIMIT = 10;
 
 export default function RepoDetailPage() {
   const { repoId } = useParams();
   const [summaries, setSummaries] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-
-  const LIMIT = 10;
 
   useEffect(() => {
     setLoading(true);
     fetchSummaries({ repoId, limit: LIMIT, page })
-      .then((data) => {
-        setSummaries(data.summaries);
-        setTotal(data.total);
-      })
+      .then((d) => { setSummaries(d.summaries); setTotal(d.total); })
       .finally(() => setLoading(false));
   }, [repoId, page]);
 
@@ -27,62 +25,57 @@ export default function RepoDetailPage() {
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-6">
-        <Link to="/dashboard" className="text-gray-400 hover:text-gray-700 transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex items-center gap-2">
-          <Folder className="w-5 h-5 text-indigo-500" />
-          <h1 className="text-lg font-semibold text-gray-900">
-            {repoName ?? "Repository"}
-          </h1>
-        </div>
-        <span className="text-xs text-gray-400">{total} summaries</span>
-      </div>
+    <div className="flex-1 flex flex-col min-h-screen bg-gh-canvas">
+      <TopBar
+        title={repoName || "Repository"}
+        subtitle={`${total} summaries`}
+      />
 
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
-          ))}
-        </div>
-      ) : summaries.length === 0 ? (
-        <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center">
-          <p className="text-gray-500 text-sm">No summaries for this repo yet.</p>
-          <p className="text-gray-400 text-xs mt-1">Push a commit to generate the first summary.</p>
-        </div>
-      ) : (
-        <>
-          <div className="space-y-3 mb-6">
-            {summaries.map((s) => (
-              <SummaryCard key={s._id} summary={s} />
+      <div className="flex-1 p-6 max-w-4xl w-full mx-auto">
+        <Link
+          to="/app/repos"
+          className="inline-flex items-center gap-1.5 text-xs text-gh-subtle hover:text-gh-muted mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to repositories
+        </Link>
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="h-32 bg-gh-surface border border-gh-border rounded-xl animate-pulse" />
             ))}
           </div>
-
-          {totalPages > 1 && (
-            <div className="flex justify-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
-              >
-                Previous
-              </button>
-              <span className="px-3 py-1.5 text-sm text-gray-500">
-                {page} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
-              >
-                Next
-              </button>
+        ) : summaries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-12 h-12 rounded-2xl bg-gh-inset border border-gh-border flex items-center justify-center mb-4">
+              <FolderGit2 className="w-6 h-6 text-gh-subtle" />
             </div>
-          )}
-        </>
-      )}
+            <p className="text-sm font-semibold text-gh-fg mb-1">No summaries yet</p>
+            <p className="text-xs text-gh-muted">Push a commit to this repository to generate a summary.</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3 mb-6">
+              {summaries.map(s => <SummaryCard key={s._id} summary={s} />)}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}
+                  className="px-3 py-1.5 text-xs bg-gh-surface border border-gh-border rounded-lg text-gh-muted hover:text-gh-fg hover:border-gh-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  Previous
+                </button>
+                <span className="text-xs text-gh-subtle px-2">Page {page} of {totalPages}</span>
+                <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}
+                  className="px-3 py-1.5 text-xs bg-gh-surface border border-gh-border rounded-lg text-gh-muted hover:text-gh-fg hover:border-gh-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

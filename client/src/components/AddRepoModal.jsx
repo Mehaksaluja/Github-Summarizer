@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, GitFork } from "lucide-react";
 import { registerRepo } from "../api/repos";
 
 export default function AddRepoModal({ onClose, onAdded }) {
@@ -23,46 +23,61 @@ export default function AddRepoModal({ onClose, onAdded }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Add Repository</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gh-surface border border-gh-border rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gh-line">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gh-accent/10 border border-gh-accent/20 flex items-center justify-center">
+              <GitFork className="w-3.5 h-3.5 text-gh-accent" />
+            </div>
+            <h2 className="text-sm font-semibold text-gh-fg">Add Repository</h2>
+          </div>
+          <button onClick={onClose} className="text-gh-subtle hover:text-gh-fg transition-colors">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Repository (owner/repo)
+            <label className="block text-xs font-medium text-gh-muted mb-1.5">
+              GitHub repository
             </label>
             <input
               type="text"
-              placeholder="e.g. octocat/hello-world"
+              placeholder="owner/repo-name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2.5 text-sm text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors font-mono"
               required
+              autoFocus
             />
+            <p className="mt-1.5 text-[11px] text-gh-subtle">
+              Enter the full repository path, e.g. <code className="text-gh-accent font-mono">octocat/hello-world</code>
+            </p>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <div className="bg-gh-red/10 border border-gh-red/20 rounded-lg px-3 py-2 text-sm text-gh-red">
+              {error}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-gh-muted hover:text-gh-fg bg-gh-inset hover:bg-gh-border rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              disabled={loading || !fullName.trim()}
+              className="px-4 py-2 text-sm font-semibold bg-gh-accent hover:bg-gh-accent-em text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {loading ? "Adding…" : "Add Repo"}
+              {loading ? "Adding…" : "Add Repository"}
             </button>
           </div>
         </form>
