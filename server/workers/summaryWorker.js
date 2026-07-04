@@ -3,6 +3,7 @@ import connection from "../queue/connection.js";
 import WebhookLog from "../models/WebhookLog.js";
 import Organization from "../models/Organization.js";
 import Repository from "../models/Repository.js";
+import { runPipeline } from "./pipeline.js";
 
 const FREE_TIER_REPORT_LIMIT = 1;
 
@@ -41,13 +42,10 @@ async function processJob(job) {
     return;
   }
 
-  // ── AI pipeline placeholder (Phase 5) ──────────────────────────────────────
-  // TODO: replace this stub with multi-agent orchestration
-  console.log(`[Worker] Processing ${eventType} on ${repoFullName} for org: ${org.slug}`);
-  console.log(`[Worker] Commits: ${payload.commits?.length ?? 0}`);
-  // ───────────────────────────────────────────────────────────────────────────
+  console.log(`[Worker] Running AI pipeline for ${eventType} on ${repoFullName}`);
 
-  // Increment report counter and mark complete
+  await runPipeline({ eventType, repoName: repoFullName, payload, org, repo });
+
   await Organization.findByIdAndUpdate(org._id, { $inc: { reports_generated: 1 } });
   await WebhookLog.findByIdAndUpdate(webhookLogId, { status: "completed" });
 
