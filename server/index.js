@@ -8,6 +8,7 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import webhookRoutes from "./routes/webhook.js";
 import repoRoutes from "./routes/repos.js";
+import summaryRoutes from "./routes/summaries.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -54,6 +55,7 @@ app.use(passport.session());
 app.use("/auth", authRoutes);
 app.use("/webhooks", webhookRoutes);
 app.use("/api/repos", repoRoutes);
+app.use("/api/summaries", summaryRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
