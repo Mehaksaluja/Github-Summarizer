@@ -1,3 +1,9 @@
+export async function fetchGitHubRepos() {
+  const r = await fetch("/api/repos/github", { credentials: "include" });
+  if (!r.ok) throw new Error("Failed to load GitHub repos");
+  return r.json();
+}
+
 export async function fetchRepos() {
   const r = await fetch("/api/repos", { credentials: "include" });
   if (!r.ok) throw new Error("Failed to load repos");
