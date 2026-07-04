@@ -1,14 +1,12 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import session from "express-session";
 import MongoStore from "connect-mongo";
 import passport from "./config/passport.js";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import webhookRoutes from "./routes/webhook.js";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

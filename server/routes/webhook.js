@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import WebhookLog from "../models/WebhookLog.js";
+import { summaryQueue } from "../queue/queues.js";
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ router.post("/github", verifyGitHubSignature, async (req, res) => {
   if (!handledEvents.includes(eventType)) return;
 
   try {
-    await WebhookLog.create({
+    const log = await WebhookLog.create({
       event_id: deliveryId,
       source: "github",
       event_type: eventType,
@@ -48,7 +49,20 @@ router.post("/github", verifyGitHubSignature, async (req, res) => {
       payload,
     });
 
-    console.log(`[Webhook] ${eventType} received — delivery: ${deliveryId}`);
+    await summaryQueue.add(
+      eventType,
+      {
+        webhookLogId: log._id.toString(),
+        deliveryId,
+        eventType,
+        repoFullName: payload.repository?.full_name ?? null,
+        payload,
+      },
+      { jobId: deliveryId } // deduplicate by GitHub delivery ID
+    );
+
+    await WebhookLog.findByIdAndUpdate(log._id, { status: "queued" });
+    console.log(`[Webhook] ${eventType} queued — delivery: ${deliveryId}`);
   } catch (error) {
     // Duplicate event_id means GitHub resent the same event — safe to ignore
     if (error.code === 11000) {

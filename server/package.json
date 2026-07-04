@@ -6,17 +6,21 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "worker": "node worker.js",
+    "worker:dev": "node --watch worker.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bullmq": "^5.79.2",
     "connect-mongo": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
+    "ioredis": "^5.11.1",
     "mongoose": "^9.7.3",
     "passport": "^0.7.0",
     "passport-github2": "^0.1.12"
