@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import TopBar from "../components/TopBar";
-import { User, Building2, Bell, CreditCard, Save, Calendar, Check, Loader2 } from "lucide-react";
+import { User, Building2, Bell, CreditCard, Save, Calendar, Check, Loader2, Cpu, MessageSquare, Zap } from "lucide-react";
 import { fetchSettings, updateSchedule, updateIntegrations } from "../api/settings";
+import { useToast } from "../hooks/useToast";
+
+const BASE = import.meta.env.VITE_API_URL || "";
 
 const CADENCE_OPTIONS = [
   {
     value: "per_push",
     label: "Per Push",
-    desc: "Generate a summary for every push event. Best for small teams with low commit volume.",
-    badge: "Current",
+    desc: "Summary generated on every push. Best for small teams with low commit volume.",
   },
   {
     value: "daily",
@@ -20,25 +22,63 @@ const CADENCE_OPTIONS = [
   {
     value: "weekly",
     label: "Weekly Digest",
-    desc: "One summary every Monday morning. Best for managers who want a weekly engineering overview.",
-    badge: null,
+    desc: "One summary every Monday morning. Best for managers who want a weekly overview.",
   },
 ];
 
+const MODEL_OPTIONS = [
+  {
+    value: "gpt-4o-mini",
+    label: "GPT-4o Mini",
+    tagline: "Fast & affordable",
+    desc: "Great for most teams. Processes quickly and costs less per summary.",
+    cost: "$0.001 / summary",
+  },
+  {
+    value: "gpt-4o",
+    label: "GPT-4o",
+    tagline: "Best quality",
+    desc: "More detailed and accurate summaries. Best for client reports and executive dashboards.",
+    cost: "$0.005 / summary",
+    badge: "Pro",
+  },
+];
+
+async function apiPut(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Save failed");
+  return res.json();
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const isPro = user?.org?.plan_tier !== "free";
 
+  // Digest schedule
   const [cadence, setCadence] = useState("per_push");
   const [originalCadence, setOriginalCadence] = useState("per_push");
   const [scheduleSaving, setScheduleSaving] = useState(false);
-  const [scheduleSaved, setScheduleSaved] = useState(false);
 
+  // Integrations
   const [slack, setSlack] = useState("");
   const [discord, setDiscord] = useState("");
   const [integrationSaving, setIntegrationSaving] = useState(false);
-  const [integrationSaved, setIntegrationSaved] = useState(false);
 
-  const isPro = user?.org?.plan_tier !== "free";
+  // AI model
+  const [model, setModel] = useState("gpt-4o-mini");
+  const [originalModel, setOriginalModel] = useState("gpt-4o-mini");
+  const [modelSaving, setModelSaving] = useState(false);
+
+  // Custom prompt
+  const [summarizerPrompt, setSummarizerPrompt] = useState("");
+  const [originalPrompt, setOriginalPrompt] = useState("");
+  const [promptSaving, setPromptSaving] = useState(false);
 
   useEffect(() => {
     fetchSettings()
@@ -48,37 +88,53 @@ export default function SettingsPage() {
         setOriginalCadence(c);
         setSlack(data.integrations?.slack_webhook_url ?? "");
         setDiscord(data.integrations?.discord_webhook_url ?? "");
+        const m = data.preferred_ai_model ?? "gpt-4o-mini";
+        setModel(m);
+        setOriginalModel(m);
+        const p = data.custom_prompts?.summarizer ?? "";
+        setSummarizerPrompt(p);
+        setOriginalPrompt(p);
       })
       .catch(() => {});
   }, []);
 
   async function saveSchedule() {
     setScheduleSaving(true);
-    setScheduleSaved(false);
     try {
       await updateSchedule({ cadence });
       setOriginalCadence(cadence);
-      setScheduleSaved(true);
-      setTimeout(() => setScheduleSaved(false), 3000);
-    } catch {
-      /* surface via UI if needed */
-    } finally {
-      setScheduleSaving(false);
-    }
+      showToast("Digest schedule saved", "success");
+    } catch { showToast("Save failed", "error"); }
+    setScheduleSaving(false);
   }
 
   async function saveIntegrations() {
     setIntegrationSaving(true);
-    setIntegrationSaved(false);
     try {
       await updateIntegrations({ slack_webhook_url: slack, discord_webhook_url: discord });
-      setIntegrationSaved(true);
-      setTimeout(() => setIntegrationSaved(false), 3000);
-    } catch {
-      /* surface via UI if needed */
-    } finally {
-      setIntegrationSaving(false);
-    }
+      showToast("Integrations saved", "success");
+    } catch { showToast("Save failed", "error"); }
+    setIntegrationSaving(false);
+  }
+
+  async function saveModel() {
+    setModelSaving(true);
+    try {
+      await apiPut("/api/settings/model", { preferred_ai_model: model });
+      setOriginalModel(model);
+      showToast("AI model preference saved", "success");
+    } catch { showToast("Save failed", "error"); }
+    setModelSaving(false);
+  }
+
+  async function savePrompt() {
+    setPromptSaving(true);
+    try {
+      await apiPut("/api/settings/prompts", { summarizer: summarizerPrompt || null });
+      setOriginalPrompt(summarizerPrompt);
+      showToast("Custom prompt saved", "success");
+    } catch { showToast("Save failed", "error"); }
+    setPromptSaving(false);
   }
 
   return (
@@ -106,7 +162,7 @@ export default function SettingsPage() {
             <input
               value={user?.org?.name ?? ""}
               readOnly
-              className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2.5 text-sm text-gh-fg placeholder-gh-subtle focus:outline-none opacity-60 cursor-not-allowed"
+              className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2.5 text-sm text-gh-fg opacity-60 cursor-not-allowed"
             />
           </div>
           <div className="mt-3 flex items-center gap-3">
@@ -118,9 +174,7 @@ export default function SettingsPage() {
               {user?.org?.plan_tier === "free" ? "Free plan" : "Pro plan"}
             </div>
             {user?.org?.plan_tier === "free" && (
-              <span className="text-xs text-gh-subtle">
-                {user?.org?.reports_generated ?? 0} / 1 reports used
-              </span>
+              <span className="text-xs text-gh-subtle">{user?.org?.reports_generated ?? 0} / 1 reports used</span>
             )}
           </div>
         </Section>
@@ -128,9 +182,8 @@ export default function SettingsPage() {
         {/* Digest Schedule */}
         <Section icon={<Calendar className="w-4 h-4" />} title="Digest Schedule">
           <p className="text-xs text-gh-subtle mb-4">
-            Choose how often GitPulse generates summaries for your repositories. Daily and weekly digests roll up all commits into one clean summary instead of notifying on every push.
+            Choose how often GitPulse generates summaries. Daily and weekly digests batch all commits into one clean summary.
           </p>
-
           <div className="space-y-2.5">
             {CADENCE_OPTIONS.map((opt) => (
               <button
@@ -144,21 +197,13 @@ export default function SettingsPage() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      cadence === opt.value ? "border-gh-accent" : "border-gh-border"
-                    }`}>
-                      {cadence === opt.value && (
-                        <div className="w-2 h-2 rounded-full bg-gh-accent" />
-                      )}
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${cadence === opt.value ? "border-gh-accent" : "border-gh-border"}`}>
+                      {cadence === opt.value && <div className="w-2 h-2 rounded-full bg-gh-accent" />}
                     </div>
                     <span className="text-sm font-semibold text-gh-fg">{opt.label}</span>
                   </div>
                   {opt.badge && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                      opt.badge === "Recommended"
-                        ? "bg-gh-green/10 border-gh-green/20 text-gh-green"
-                        : "bg-gh-accent/10 border-gh-accent/20 text-gh-accent"
-                    }`}>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-gh-green/10 border-gh-green/20 text-gh-green">
                       {opt.badge}
                     </span>
                   )}
@@ -167,32 +212,90 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-
           {cadence !== "per_push" && (
             <div className="mt-3 p-3 rounded-lg bg-gh-accent/5 border border-gh-accent/20 text-xs text-gh-accent">
               Digests run at <strong>9:00 AM UTC</strong>.
-              {cadence === "daily" && " Yesterday's commits will be bundled each morning."}
-              {cadence === "weekly" && " Last 7 days of commits will be bundled every Monday."}
+              {cadence === "daily" && " Yesterday's commits bundled each morning."}
+              {cadence === "weekly" && " Last 7 days bundled every Monday."}
             </div>
           )}
-
           <div className="mt-4 flex items-center gap-3">
-            <button
-              onClick={saveSchedule}
-              disabled={scheduleSaving || cadence === originalCadence}
-              className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              {scheduleSaving ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : scheduleSaved ? (
-                <Check className="w-3.5 h-3.5" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              {scheduleSaved ? "Saved!" : "Save Schedule"}
-            </button>
-            {cadence !== originalCadence && (
-              <span className="text-xs text-gh-subtle">Unsaved changes</span>
+            <SaveButton onClick={saveSchedule} saving={scheduleSaving} disabled={cadence === originalCadence} />
+            {cadence !== originalCadence && <span className="text-xs text-gh-subtle">Unsaved changes</span>}
+          </div>
+        </Section>
+
+        {/* AI Model */}
+        <Section icon={<Cpu className="w-4 h-4" />} title="AI Model">
+          <p className="text-xs text-gh-subtle mb-4">
+            Choose which OpenAI model generates your summaries. Better models produce richer output at higher cost.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {MODEL_OPTIONS.map((opt) => {
+              const locked = opt.badge === "Pro" && !isPro;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => !locked && setModel(opt.value)}
+                  disabled={locked}
+                  className={`text-left rounded-xl border p-4 transition-all ${
+                    model === opt.value
+                      ? "border-gh-accent bg-gh-accent/5 ring-1 ring-gh-accent/20"
+                      : locked
+                      ? "border-gh-border opacity-50 cursor-not-allowed"
+                      : "border-gh-border bg-gh-surface hover:border-gh-muted/50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gh-fg">{opt.label}</p>
+                      <p className="text-[10px] text-gh-subtle mt-0.5">{opt.tagline}</p>
+                    </div>
+                    {opt.badge && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-gh-yellow/10 border-gh-yellow/20 text-gh-yellow shrink-0">
+                        {opt.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-gh-subtle mb-2">{opt.desc}</p>
+                  <div className="flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-gh-muted" />
+                    <span className="text-[10px] font-mono text-gh-muted">{opt.cost}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <SaveButton onClick={saveModel} saving={modelSaving} disabled={model === originalModel} />
+            {model !== originalModel && <span className="text-xs text-gh-subtle">Unsaved changes</span>}
+          </div>
+        </Section>
+
+        {/* Custom Prompts */}
+        <Section icon={<MessageSquare className="w-4 h-4" />} title="Custom Prompt">
+          <p className="text-xs text-gh-subtle mb-4">
+            Override the default AI system prompt for summaries. Leave blank to use the default.
+            Use this to change tone (technical, client-friendly) or focus area.
+          </p>
+          <label className="block text-xs font-medium text-gh-muted mb-1.5">Summarizer system prompt</label>
+          <textarea
+            value={summarizerPrompt}
+            onChange={(e) => setSummarizerPrompt(e.target.value)}
+            placeholder={`Default: "You are a developer communication expert. Translate raw GitHub activity into clear, human-friendly summaries..."`}
+            rows={5}
+            className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2.5 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors resize-none font-mono"
+          />
+          <p className="text-[11px] text-gh-subtle mt-1.5">
+            Variables you can reference: {"{repoName}"}, {"{eventType}"}, {"{branch}"}
+          </p>
+          <div className="mt-3 flex items-center gap-3">
+            <SaveButton onClick={savePrompt} saving={promptSaving} disabled={summarizerPrompt === originalPrompt} />
+            {summarizerPrompt !== originalPrompt && <span className="text-xs text-gh-subtle">Unsaved changes</span>}
+            {summarizerPrompt && (
+              <button onClick={() => setSummarizerPrompt("")} className="text-xs text-gh-subtle hover:text-gh-red transition-colors">
+                Reset to default
+              </button>
             )}
           </div>
         </Section>
@@ -200,42 +303,14 @@ export default function SettingsPage() {
         {/* Integrations */}
         <Section icon={<Bell className="w-4 h-4" />} title="Integrations">
           <div className="space-y-4">
-            <IntegrationInput
-              label="Slack webhook URL"
-              desc="Post summaries to a Slack channel automatically."
-              placeholder="https://hooks.slack.com/services/..."
-              value={slack}
-              onChange={setSlack}
-              disabled={!isPro}
-            />
-            <IntegrationInput
-              label="Discord webhook URL"
-              desc="Post summaries to a Discord channel automatically."
-              placeholder="https://discord.com/api/webhooks/..."
-              value={discord}
-              onChange={setDiscord}
-              disabled={!isPro}
-            />
+            <IntegrationInput label="Slack webhook URL" desc="Post summaries to a Slack channel automatically." placeholder="https://hooks.slack.com/services/..." value={slack} onChange={setSlack} disabled={!isPro} />
+            <IntegrationInput label="Discord webhook URL" desc="Post summaries to a Discord channel automatically." placeholder="https://discord.com/api/webhooks/..." value={discord} onChange={setDiscord} disabled={!isPro} />
           </div>
-
           {!isPro ? (
             <p className="mt-3 text-xs text-gh-subtle">Slack and Discord delivery requires the Pro plan.</p>
           ) : (
-            <div className="mt-4 flex items-center gap-3">
-              <button
-                onClick={saveIntegrations}
-                disabled={integrationSaving}
-                className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-              >
-                {integrationSaving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : integrationSaved ? (
-                  <Check className="w-3.5 h-3.5" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
-                )}
-                {integrationSaved ? "Saved!" : "Save Integrations"}
-              </button>
+            <div className="mt-4">
+              <SaveButton onClick={saveIntegrations} saving={integrationSaving} />
             </div>
           )}
         </Section>
@@ -247,13 +322,13 @@ export default function SettingsPage() {
               <p className="text-sm font-medium text-gh-fg capitalize">{user?.org?.plan_tier} plan</p>
               <p className="text-xs text-gh-subtle mt-0.5">
                 {user?.org?.plan_tier === "free"
-                  ? "Upgrade to unlock unlimited reports, Slack delivery, and weekly digests."
+                  ? "Upgrade to unlock unlimited reports, Slack, GPT-4o, and weekly digests."
                   : `Subscription status: ${user?.org?.subscription_status}`}
               </p>
             </div>
             {user?.org?.plan_tier === "free" && (
               <button className="text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white px-4 py-2 rounded-lg transition-colors shrink-0">
-                Upgrade to Pro — $19/mo
+                Upgrade — $19/mo
               </button>
             )}
           </div>
@@ -275,12 +350,23 @@ function Section({ icon, title, children }) {
   );
 }
 
+function SaveButton({ onClick, saving, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={saving || disabled}
+      className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+    >
+      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+      {saving ? "Saving..." : "Save"}
+    </button>
+  );
+}
+
 function IntegrationInput({ label, desc, placeholder, value, onChange, disabled }) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-xs font-medium text-gh-muted">{label}</label>
-      </div>
+      <label className="text-xs font-medium text-gh-muted block mb-1">{label}</label>
       <p className="text-[11px] text-gh-subtle mb-1.5">{desc}</p>
       <input
         value={value}

@@ -2,13 +2,13 @@ import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export async function runFrameworkAgent({ commits, pr }) {
+export async function runFrameworkAgent({ commits, pr, model = "gpt-4o-mini" }) {
   const items = pr
     ? [{ message: pr.title, files: pr.files.map((f) => f.filename) }]
     : commits.map((c) => ({ message: c.message, files: c.files.map((f) => f.filename) }));
 
   const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model,
     messages: [
       {
         role: "system",

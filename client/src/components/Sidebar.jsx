@@ -1,11 +1,13 @@
 import { NavLink, Link } from "react-router-dom";
-import { GitBranch, LayoutDashboard, FolderGit2, ScrollText, Settings, LogOut, Zap } from "lucide-react";
+import { GitBranch, LayoutDashboard, FolderGit2, ScrollText, Settings, LogOut, Zap, BarChart2, Webhook } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 const NAV = [
   { to: "/app/overview",   icon: LayoutDashboard, label: "Overview" },
   { to: "/app/repos",      icon: FolderGit2,      label: "Repositories" },
   { to: "/app/summaries",  icon: ScrollText,       label: "Summaries" },
+  { to: "/app/analytics",  icon: BarChart2,        label: "Analytics" },
+  { to: "/app/webhooks",   icon: Webhook,          label: "Webhooks" },
   { to: "/app/settings",   icon: Settings,         label: "Settings" },
 ];
 
@@ -58,7 +60,7 @@ export default function Sidebar() {
               <span className="text-xs font-semibold text-gh-accent">Free plan</span>
             </div>
             <p className="text-[11px] text-gh-subtle leading-snug mb-2">
-              Upgrade for unlimited reports, Slack, and PDF export.
+              Upgrade for unlimited reports, Slack, GPT-4o, and PDF export.
             </p>
             <button className="w-full text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white py-1.5 rounded-md transition-colors">
               Upgrade to Pro
@@ -77,9 +79,7 @@ export default function Sidebar() {
               className="w-6 h-6 rounded-full shrink-0 ring-1 ring-gh-border"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gh-fg truncate">
-                {user.display_name || user.username}
-              </p>
+              <p className="text-xs font-medium text-gh-fg truncate">{user.display_name || user.username}</p>
               <p className="text-[10px] text-gh-subtle truncate">{user.org?.name}</p>
             </div>
             <button

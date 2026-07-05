@@ -153,6 +153,8 @@ async function generateDigestForOrg(org, cadence) {
         branch: repo.default_branch ?? "main",
         commits,
         pr: null,
+        model: org.preferred_ai_model || "gpt-4o-mini",
+        customSummarizerPrompt: org.custom_prompts?.summarizer || null,
       });
 
       if (!summary && !framework) continue;

@@ -18,6 +18,18 @@ const organizationSchema = new mongoose.Schema(
     // Free tier gate — incremented every time a report is generated
     reports_generated: { type: Number, default: 0 },
 
+    // AI model preference for generating summaries
+    preferred_ai_model: {
+      type: String,
+      enum: ["gpt-4o-mini", "gpt-4o"],
+      default: "gpt-4o-mini",
+    },
+
+    // Custom system prompts per agent (null = use default)
+    custom_prompts: {
+      summarizer: { type: String, default: null },
+    },
+
     // Digest delivery schedule
     digest_schedule: {
       cadence: { type: String, enum: ["per_push", "daily", "weekly"], default: "per_push" },

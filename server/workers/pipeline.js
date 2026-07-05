@@ -78,13 +78,15 @@ export async function runPipeline({ eventType, repoName, payload, org, repo }) {
 
   const branch = payload.ref?.replace("refs/heads/", "") ?? null;
 
-  // Run the multi-agent pipeline
+  // Run the multi-agent pipeline with org's preferred model + custom prompts
   const { summary, blockers, framework } = await runOrchestrator({
     eventType,
     repoName,
     branch,
     commits,
     pr: prData,
+    model: org.preferred_ai_model || "gpt-4o-mini",
+    customSummarizerPrompt: org.custom_prompts?.summarizer || null,
   });
 
   // Nothing to save if all agents were skipped (e.g. PR review event)

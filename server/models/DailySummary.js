@@ -28,6 +28,17 @@ const dailySummarySchema = new mongoose.Schema(
     // Vector embedding for future RAG ("Chat with Codebase")
     embedding: { type: [Number], default: [] },
 
+    // User feedback on summary quality
+    feedback: {
+      rating: { type: String, enum: ["up", "down"], default: null },
+      note: { type: String, default: null },
+      rated_at: { type: Date, default: null },
+    },
+
+    // Soft archive — hidden from default list view but not deleted
+    is_archived: { type: Boolean, default: false },
+    archived_at: { type: Date, default: null },
+
     delivered_to: {
       slack: { type: Boolean, default: false },
       discord: { type: Boolean, default: false },

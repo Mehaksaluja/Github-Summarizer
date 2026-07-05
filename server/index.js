@@ -10,6 +10,8 @@ import webhookRoutes from "./routes/webhook.js";
 import repoRoutes from "./routes/repos.js";
 import summaryRoutes from "./routes/summaries.js";
 import settingsRoutes from "./routes/settings.js";
+import analyticsRoutes from "./routes/analytics.js";
+import webhookLogRoutes from "./routes/webhookLogs.js";
 import { startDigestScheduler } from "./services/digestScheduler.js";
 
 const app = express();
@@ -59,6 +61,8 @@ app.use("/webhooks", webhookRoutes);
 app.use("/api/repos", repoRoutes);
 app.use("/api/summaries", summaryRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/webhook-logs", webhookLogRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

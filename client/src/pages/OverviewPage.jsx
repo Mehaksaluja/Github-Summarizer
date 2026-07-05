@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FolderGit2, ScrollText, GitCommit, GitMerge, ArrowRight, Plus, Sparkles } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
 import { fetchRepos } from "../api/repos";
 import { fetchSummaries } from "../api/summaries";
 import TopBar from "../components/TopBar";
@@ -10,19 +11,42 @@ import AddRepoModal from "../components/AddRepoModal";
 
 export default function OverviewPage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [repos, setRepos] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [total, setTotal] = useState(0);
   const [loadingRepos, setLoadingRepos] = useState(true);
   const [loadingSummaries, setLoadingSummaries] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const lastChecked = useRef(new Date().toISOString());
 
   useEffect(() => {
     fetchRepos().then(setRepos).finally(() => setLoadingRepos(false));
     fetchSummaries({ limit: 5 })
       .then((d) => { setSummaries(d.summaries); setTotal(d.total); })
       .finally(() => setLoadingSummaries(false));
-  }, []);
+
+    // Poll for new summaries every 30s — show toast when one arrives
+    const poll = setInterval(async () => {
+      try {
+        const since = lastChecked.current;
+        lastChecked.current = new Date().toISOString();
+        const { summaries: fresh } = await fetchSummaries({ limit: 5, since });
+        if (fresh.length > 0) {
+          fresh.forEach((s) => {
+            showToast(`New summary ready: ${s.repo_id?.name ?? "repo"} — ${s.date}`, "summary");
+          });
+          // Refresh the visible list
+          fetchSummaries({ limit: 5 }).then((d) => {
+            setSummaries(d.summaries);
+            setTotal(d.total);
+          });
+        }
+      } catch { /* ignore poll errors */ }
+    }, 30000);
+
+    return () => clearInterval(poll);
+  }, [showToast]);
 
   const totalCommits = summaries.reduce((a, s) => a + (s.stats?.total_commits ?? 0), 0);
   const totalPRs     = summaries.reduce((a, s) => a + (s.stats?.prs_merged ?? 0), 0);
@@ -72,7 +96,14 @@ export default function OverviewPage() {
               <EmptySummaries onAddRepo={() => setShowModal(true)} />
             ) : (
               <div className="space-y-3">
-                {summaries.map(s => <SummaryCard key={s._id} summary={s} />)}
+                {summaries.map(s => (
+                  <SummaryCard
+                    key={s._id}
+                    summary={s}
+                    onArchived={(id) => setSummaries((prev) => prev.filter((x) => x._id !== id))}
+                    onDeleted={(id) => setSummaries((prev) => prev.filter((x) => x._id !== id))}
+                  />
+                ))}
               </div>
             )}
           </section>

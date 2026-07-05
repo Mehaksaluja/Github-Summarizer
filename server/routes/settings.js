@@ -15,33 +15,31 @@ router.get("/", requireAuth, async (req, res) => {
   if (!org) return res.status(404).json({ message: "Organization not found" });
 
   res.json({
+    preferred_ai_model: org.preferred_ai_model ?? "gpt-4o-mini",
+    custom_prompts: org.custom_prompts ?? { summarizer: null },
     digest_schedule: org.digest_schedule ?? { cadence: "per_push", hour: 9 },
     integrations: org.integrations ?? {},
   });
 });
 
-// PUT /api/settings/schedule — update digest cadence
+// PUT /api/settings/schedule
 router.put("/schedule", requireAuth, async (req, res) => {
   const { cadence, hour } = req.body;
-
   if (!["per_push", "daily", "weekly"].includes(cadence)) {
     return res.status(400).json({ message: "cadence must be per_push, daily, or weekly" });
   }
-
   const orgId = req.user.org_id._id ?? req.user.org_id;
   const updated = await Organization.findByIdAndUpdate(
     orgId,
     { $set: { "digest_schedule.cadence": cadence, "digest_schedule.hour": hour ?? 9 } },
     { new: true }
   ).lean();
-
   res.json({ digest_schedule: updated.digest_schedule });
 });
 
-// PUT /api/settings/integrations — save Slack/Discord/email URLs
+// PUT /api/settings/integrations
 router.put("/integrations", requireAuth, async (req, res) => {
   const { slack_webhook_url, discord_webhook_url, email } = req.body;
-
   const orgId = req.user.org_id._id ?? req.user.org_id;
   const updated = await Organization.findByIdAndUpdate(
     orgId,
@@ -54,8 +52,34 @@ router.put("/integrations", requireAuth, async (req, res) => {
     },
     { new: true }
   ).lean();
-
   res.json({ integrations: updated.integrations });
+});
+
+// PUT /api/settings/model — AI model preference
+router.put("/model", requireAuth, async (req, res) => {
+  const { preferred_ai_model } = req.body;
+  if (!["gpt-4o-mini", "gpt-4o"].includes(preferred_ai_model)) {
+    return res.status(400).json({ message: "Invalid model" });
+  }
+  const orgId = req.user.org_id._id ?? req.user.org_id;
+  const updated = await Organization.findByIdAndUpdate(
+    orgId,
+    { $set: { preferred_ai_model } },
+    { new: true }
+  ).lean();
+  res.json({ preferred_ai_model: updated.preferred_ai_model });
+});
+
+// PUT /api/settings/prompts — custom system prompts
+router.put("/prompts", requireAuth, async (req, res) => {
+  const { summarizer } = req.body;
+  const orgId = req.user.org_id._id ?? req.user.org_id;
+  const updated = await Organization.findByIdAndUpdate(
+    orgId,
+    { $set: { "custom_prompts.summarizer": summarizer || null } },
+    { new: true }
+  ).lean();
+  res.json({ custom_prompts: updated.custom_prompts });
 });
 
 export default router;
