@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { ScrollText, Filter, List, Calendar, Archive, ArchiveRestore } from "lucide-react";
+import { ScrollText, Filter, List, Calendar, Archive, ArchiveRestore, BarChart2 } from "lucide-react";
 import { fetchSummaries } from "../api/summaries";
 import { fetchRepos } from "../api/repos";
 import TopBar from "../components/TopBar";
 import SummaryCard from "../components/SummaryCard";
+import GenerateReportModal from "../components/GenerateReportModal";
 
 const TYPES = [
   { value: "", label: "All types" },
@@ -12,6 +13,7 @@ const TYPES = [
   { value: "executive_dashboard", label: "Executive" },
   { value: "daily_digest", label: "Daily Digest" },
   { value: "weekly_digest", label: "Weekly Digest" },
+  { value: "custom_report", label: "Custom Report" },
 ];
 
 const LIMIT = 10;
@@ -35,6 +37,7 @@ export default function SummariesPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [viewMode, setViewMode] = useState("list"); // "list" | "timeline"
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   useEffect(() => { fetchRepos().then(setRepos); }, []);
 
@@ -77,7 +80,19 @@ export default function SummariesPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-gh-canvas">
-      <TopBar title="Summaries" subtitle={`${total} total`} />
+      <TopBar
+        title="Summaries"
+        subtitle={`${total} total`}
+        actions={
+          <button
+            onClick={() => setShowGenerateModal(true)}
+            className="flex items-center gap-1.5 bg-gh-accent hover:bg-gh-accent-em text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            Generate Report
+          </button>
+        }
+      />
 
       <div className="flex-1 p-6 max-w-4xl w-full mx-auto">
         {/* Filter bar */}
@@ -224,6 +239,13 @@ export default function SummariesPage() {
           </div>
         )}
       </div>
+
+      {showGenerateModal && (
+        <GenerateReportModal
+          onClose={() => setShowGenerateModal(false)}
+          onGenerated={() => { setPage(1); load(); }}
+        />
+      )}
     </div>
   );
 }

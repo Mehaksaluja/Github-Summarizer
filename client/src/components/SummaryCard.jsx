@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { GitCommit, GitMerge, Calendar, ArrowRight, Zap, Bug, Wrench, ThumbsUp, ThumbsDown, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { GitCommit, GitMerge, Calendar, ArrowRight, Zap, Bug, Wrench, ThumbsUp, ThumbsDown, Archive, ArchiveRestore, Trash2, Users } from "lucide-react";
 import Markdown from "react-markdown";
 import { submitFeedback, archiveSummary, deleteSummary } from "../api/summaries";
 
@@ -10,6 +10,7 @@ const TYPE_META = {
   executive_dashboard:  { label: "Executive",     color: "text-gh-green  bg-gh-green/10  border-gh-green/20"  },
   daily_digest:         { label: "Daily Digest",  color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
   weekly_digest:        { label: "Weekly Digest", color: "text-orange-400 bg-orange-400/10 border-orange-400/20" },
+  custom_report:        { label: "Custom Report", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
 };
 
 export default function SummaryCard({ summary, expanded = false, onArchived, onDeleted }) {
@@ -79,6 +80,9 @@ export default function SummaryCard({ summary, expanded = false, onArchived, onD
       {/* Stats row */}
       <div className="px-5 pb-3 flex items-center gap-4 flex-wrap">
         <Chip icon={<GitCommit className="w-3 h-3" />} val={stats.total_commits} label="commits" />
+        {stats.contributors > 0 && (
+          <Chip icon={<Users className="w-3 h-3 text-gh-blue" />} val={stats.contributors} label="contributors" valCls="text-gh-blue" />
+        )}
         <Chip icon={<GitMerge className="w-3 h-3" />} val={stats.prs_merged} label="PRs" />
         <div className="w-px h-3.5 bg-gh-border" />
         <Chip icon={<Zap className="w-3 h-3 text-gh-green" />}    val={stats.features}  label="features" valCls="text-gh-green" />

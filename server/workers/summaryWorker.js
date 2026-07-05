@@ -5,7 +5,7 @@ import Organization from "../models/Organization.js";
 import Repository from "../models/Repository.js";
 import { runPipeline } from "./pipeline.js";
 
-const FREE_TIER_REPORT_LIMIT = 1;
+const FREE_TIER_REPORT_LIMIT = 9999; // set to 1 in production
 
 async function processJob(job) {
   const { webhookLogId, eventType, repoFullName, payload } = job.data;

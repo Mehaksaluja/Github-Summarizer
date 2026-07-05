@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, FolderGit2 } from "lucide-react";
+import { ArrowLeft, FolderGit2, BarChart2 } from "lucide-react";
 import { fetchSummaries } from "../api/summaries";
 import TopBar from "../components/TopBar";
 import SummaryCard from "../components/SummaryCard";
+import GenerateReportModal from "../components/GenerateReportModal";
 
 const LIMIT = 10;
 
@@ -13,13 +14,16 @@ export default function RepoDetailPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
     fetchSummaries({ repoId, limit: LIMIT, page })
       .then((d) => { setSummaries(d.summaries); setTotal(d.total); })
       .finally(() => setLoading(false));
   }, [repoId, page]);
+
+  useEffect(() => { load(); }, [load]);
 
   const repoName = summaries[0]?.repo_id?.full_name;
   const totalPages = Math.ceil(total / LIMIT);
@@ -29,6 +33,15 @@ export default function RepoDetailPage() {
       <TopBar
         title={repoName || "Repository"}
         subtitle={`${total} summaries`}
+        actions={
+          <button
+            onClick={() => setShowGenerateModal(true)}
+            className="flex items-center gap-1.5 bg-gh-accent hover:bg-gh-accent-em text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            Generate Report
+          </button>
+        }
       />
 
       <div className="flex-1 p-6 max-w-4xl w-full mx-auto">
@@ -52,12 +65,31 @@ export default function RepoDetailPage() {
               <FolderGit2 className="w-6 h-6 text-gh-subtle" />
             </div>
             <p className="text-sm font-semibold text-gh-fg mb-1">No summaries yet</p>
-            <p className="text-xs text-gh-muted">Push a commit to this repository to generate a summary.</p>
+            <p className="text-xs text-gh-muted mb-5">Push a commit or generate a report to get started.</p>
+            <button
+              onClick={() => setShowGenerateModal(true)}
+              className="flex items-center gap-1.5 bg-gh-accent hover:bg-gh-accent-em text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              Generate First Report
+            </button>
           </div>
         ) : (
           <>
             <div className="space-y-3 mb-6">
-              {summaries.map(s => <SummaryCard key={s._id} summary={s} />)}
+              {summaries.map(s => (
+                <SummaryCard
+                  key={s._id}
+                  summary={s}
+                  onArchived={(id, archived) =>
+                    setSummaries((prev) => prev.map((x) => x._id === id ? { ...x, is_archived: archived } : x))
+                  }
+                  onDeleted={(id) => {
+                    setSummaries((prev) => prev.filter((x) => x._id !== id));
+                    setTotal((t) => t - 1);
+                  }}
+                />
+              ))}
             </div>
 
             {totalPages > 1 && (
@@ -76,6 +108,14 @@ export default function RepoDetailPage() {
           </>
         )}
       </div>
+
+      {showGenerateModal && (
+        <GenerateReportModal
+          preSelectedRepoId={repoId}
+          onClose={() => setShowGenerateModal(false)}
+          onGenerated={() => { setPage(1); load(); }}
+        />
+      )}
     </div>
   );
 }

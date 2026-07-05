@@ -12,8 +12,14 @@ const dailySummarySchema = new mongoose.Schema(
     summary_markdown: { type: String, required: true },
     summary_type: {
       type: String,
-      enum: ["standup", "client_report", "executive_dashboard", "daily_digest", "weekly_digest"],
+      enum: ["standup", "client_report", "executive_dashboard", "daily_digest", "weekly_digest", "custom_report"],
       required: true,
+    },
+
+    // Actual time window covered by this summary (ISO strings)
+    period: {
+      since: { type: Date },
+      until: { type: Date },
     },
 
     // Categorized commit counts
@@ -23,6 +29,7 @@ const dailySummarySchema = new mongoose.Schema(
       chores: { type: Number, default: 0 },
       total_commits: { type: Number, default: 0 },
       prs_merged: { type: Number, default: 0 },
+      contributors: { type: Number, default: 0 },
     },
 
     // Vector embedding for future RAG ("Chat with Codebase")
