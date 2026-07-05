@@ -70,6 +70,57 @@ router.put("/model", requireAuth, async (req, res) => {
   res.json({ preferred_ai_model: updated.preferred_ai_model });
 });
 
+// POST /api/settings/test-notification — send a test message to verify webhook URLs
+router.post("/test-notification", requireAuth, async (req, res) => {
+  const { channel } = req.body; // "slack" | "discord"
+  const orgId = req.user.org_id._id ?? req.user.org_id;
+  const org = await Organization.findById(orgId).lean();
+  if (!org) return res.status(404).json({ message: "Organization not found" });
+
+  const url =
+    channel === "slack"
+      ? org.integrations?.slack_webhook_url
+      : org.integrations?.discord_webhook_url;
+
+  if (!url) return res.status(400).json({ message: `No ${channel} webhook URL configured` });
+
+  try {
+    if (channel === "slack") {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: "✅ *GitPulse test notification* — your Slack integration is working!",
+          blocks: [
+            {
+              type: "section",
+              text: { type: "mrkdwn", text: "✅ *GitPulse test notification*\nYour Slack integration is working. Summaries will appear here when generated." },
+            },
+          ],
+        }),
+      });
+      if (!r.ok) throw new Error(`Slack returned ${r.status}`);
+    } else {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embeds: [{
+            title: "✅ GitPulse test notification",
+            description: "Your Discord integration is working. Summaries will appear here when generated.",
+            color: 0x238636,
+            footer: { text: "GitPulse" },
+          }],
+        }),
+      });
+      if (!r.ok) throw new Error(`Discord returned ${r.status}`);
+    }
+    res.json({ message: "Test notification sent successfully" });
+  } catch (err) {
+    res.status(502).json({ message: `Delivery failed: ${err.message}` });
+  }
+});
+
 // PUT /api/settings/prompts — custom system prompts
 router.put("/prompts", requireAuth, async (req, res) => {
   const { summarizer } = req.body;

@@ -1,7 +1,9 @@
 import User from "../models/User.js";
 import DailySummary from "../models/DailySummary.js";
+import Repository from "../models/Repository.js";
 import { fetchPushDetails, fetchPRDetails } from "./githubFetcher.js";
 import { runOrchestrator } from "./agents/orchestrator.js";
+import { deliverNotifications } from "../services/notificationService.js";
 
 function buildMarkdown({ eventType, repoName, branch, summary, blockers, framework, pr }) {
   const date = new Date().toISOString().split("T")[0];
@@ -111,5 +113,22 @@ export async function runPipeline({ eventType, repoName, payload, org, repo }) {
   );
 
   console.log(`[Pipeline] Summary saved — id: ${saved._id}`);
+
+  // Deliver to Slack / Discord if configured
+  if (org.integrations?.slack_webhook_url || org.integrations?.discord_webhook_url) {
+    saved.populated_repo_name = repoName;
+    const delivered = await deliverNotifications({ org, savedSummary: saved, summary, blockers });
+
+    if (delivered.slack || delivered.discord) {
+      await DailySummary.findByIdAndUpdate(saved._id, {
+        $set: {
+          "delivered_to.slack": delivered.slack,
+          "delivered_to.discord": delivered.discord,
+        },
+      });
+      console.log(`[Pipeline] Delivered — slack:${delivered.slack} discord:${delivered.discord}`);
+    }
+  }
+
   return saved;
 }

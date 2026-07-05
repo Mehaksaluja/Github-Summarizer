@@ -117,6 +117,24 @@ export default function SettingsPage() {
     setIntegrationSaving(false);
   }
 
+  async function testNotification(channel) {
+    try {
+      // Save first so the test hits the current URL
+      await updateIntegrations({ slack_webhook_url: slack, discord_webhook_url: discord });
+      const res = await fetch(`${BASE}/api/settings/test-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ channel }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showToast(`Test sent to ${channel === "slack" ? "Slack" : "Discord"} successfully!`, "success");
+    } catch (err) {
+      showToast(err.message || `${channel} test failed`, "error");
+    }
+  }
+
   async function saveModel() {
     setModelSaving(true);
     try {
@@ -302,17 +320,32 @@ export default function SettingsPage() {
 
         {/* Integrations */}
         <Section icon={<Bell className="w-4 h-4" />} title="Integrations">
-          <div className="space-y-4">
-            <IntegrationInput label="Slack webhook URL" desc="Post summaries to a Slack channel automatically." placeholder="https://hooks.slack.com/services/..." value={slack} onChange={setSlack} disabled={!isPro} />
-            <IntegrationInput label="Discord webhook URL" desc="Post summaries to a Discord channel automatically." placeholder="https://discord.com/api/webhooks/..." value={discord} onChange={setDiscord} disabled={!isPro} />
+          <p className="text-xs text-gh-subtle mb-4">
+            GitPulse will automatically post summaries to these channels whenever a new one is generated.
+          </p>
+          <div className="space-y-5">
+            <IntegrationInput
+              label="Slack webhook URL"
+              desc='Create an Incoming Webhook in your Slack app settings, then paste the URL here.'
+              placeholder="https://hooks.slack.com/services/T.../B.../..."
+              value={slack}
+              onChange={setSlack}
+              onTest={() => testNotification("slack")}
+              canTest={!!slack}
+            />
+            <IntegrationInput
+              label="Discord webhook URL"
+              desc='In your Discord server, go to Channel Settings → Integrations → Webhooks to create one.'
+              placeholder="https://discord.com/api/webhooks/..."
+              value={discord}
+              onChange={setDiscord}
+              onTest={() => testNotification("discord")}
+              canTest={!!discord}
+            />
           </div>
-          {!isPro ? (
-            <p className="mt-3 text-xs text-gh-subtle">Slack and Discord delivery requires the Pro plan.</p>
-          ) : (
-            <div className="mt-4">
-              <SaveButton onClick={saveIntegrations} saving={integrationSaving} />
-            </div>
-          )}
+          <div className="mt-4">
+            <SaveButton onClick={saveIntegrations} saving={integrationSaving} />
+          </div>
         </Section>
 
         {/* Billing */}
@@ -363,18 +396,27 @@ function SaveButton({ onClick, saving, disabled }) {
   );
 }
 
-function IntegrationInput({ label, desc, placeholder, value, onChange, disabled }) {
+function IntegrationInput({ label, desc, placeholder, value, onChange, onTest, canTest }) {
   return (
     <div>
       <label className="text-xs font-medium text-gh-muted block mb-1">{label}</label>
       <p className="text-[11px] text-gh-subtle mb-1.5">{desc}</p>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-mono"
-      />
+      <div className="flex gap-2">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors font-mono"
+        />
+        <button
+          onClick={onTest}
+          disabled={!canTest}
+          title="Send a test message"
+          className="shrink-0 px-3 py-2 text-xs font-medium bg-gh-surface border border-gh-border rounded-lg text-gh-muted hover:text-gh-fg hover:border-gh-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Test
+        </button>
+      </div>
     </div>
   );
 }

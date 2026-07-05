@@ -5,6 +5,7 @@ import Repository from "../models/Repository.js";
 import User from "../models/User.js";
 import DailySummary from "../models/DailySummary.js";
 import { runOrchestrator } from "../workers/agents/orchestrator.js";
+import { deliverNotifications } from "./notificationService.js";
 
 const MAX_DIGEST_COMMITS = 20;
 const MAX_FILES_PER_COMMIT = 10;
@@ -178,13 +179,27 @@ async function generateDigestForOrg(org, cadence) {
         prs_merged: 0,
       };
 
-      await DailySummary.findOneAndUpdate(
+      const saved = await DailySummary.findOneAndUpdate(
         { org_id: org._id, repo_id: repo._id, date: dateKey, summary_type: summaryType },
         { $set: { summary_markdown: markdown, stats } },
         { upsert: true, new: true }
       );
 
       console.log(`[Digest] Saved ${cadence} digest for ${repo.full_name}`);
+
+      // Deliver to Slack / Discord if configured
+      if (org.integrations?.slack_webhook_url || org.integrations?.discord_webhook_url) {
+        saved.populated_repo_name = repo.full_name;
+        const delivered = await deliverNotifications({ org, savedSummary: saved, summary, blockers });
+        if (delivered.slack || delivered.discord) {
+          await DailySummary.findByIdAndUpdate(saved._id, {
+            $set: {
+              "delivered_to.slack": delivered.slack,
+              "delivered_to.discord": delivered.discord,
+            },
+          });
+        }
+      }
     } catch (err) {
       console.error(`[Digest] Error generating digest for ${repo.full_name}:`, err.message);
     }
