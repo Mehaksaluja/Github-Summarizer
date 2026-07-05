@@ -9,6 +9,8 @@ import authRoutes from "./routes/auth.js";
 import webhookRoutes from "./routes/webhook.js";
 import repoRoutes from "./routes/repos.js";
 import summaryRoutes from "./routes/summaries.js";
+import settingsRoutes from "./routes/settings.js";
+import { startDigestScheduler } from "./services/digestScheduler.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -56,6 +58,7 @@ app.use("/auth", authRoutes);
 app.use("/webhooks", webhookRoutes);
 app.use("/api/repos", repoRoutes);
 app.use("/api/summaries", summaryRoutes);
+app.use("/api/settings", settingsRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -63,4 +66,5 @@ app.get("/health", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  startDigestScheduler();
 });

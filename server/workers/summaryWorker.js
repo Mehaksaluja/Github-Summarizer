@@ -35,6 +35,17 @@ async function processJob(job) {
     return;
   }
 
+  // Skip immediate processing when org uses a scheduled digest cadence
+  const cadence = org.digest_schedule?.cadence ?? "per_push";
+  if (cadence !== "per_push") {
+    console.log(`[Worker] Org ${org.slug} uses ${cadence} digest — skipping per-push pipeline`);
+    await WebhookLog.findByIdAndUpdate(webhookLogId, {
+      status: "skipped_limit_reached",
+      error_message: `Digest cadence is ${cadence} — will process on schedule`,
+    });
+    return;
+  }
+
   // Free tier gate — enforced here in the worker, not just at the API layer
   if (org.plan_tier === "free" && org.reports_generated >= FREE_TIER_REPORT_LIMIT) {
     console.log(`[Worker] Free tier limit reached for org: ${org.slug}`);

@@ -10,6 +10,8 @@ const TYPES = [
   { value: "standup", label: "Standup" },
   { value: "client_report", label: "Client Report" },
   { value: "executive_dashboard", label: "Executive" },
+  { value: "daily_digest", label: "Daily Digest" },
+  { value: "weekly_digest", label: "Weekly Digest" },
 ];
 
 const LIMIT = 10;
@@ -21,6 +23,7 @@ export default function SummariesPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [repoFilter, setRepoFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
 
   useEffect(() => {
     fetchRepos().then(setRepos);
@@ -28,15 +31,20 @@ export default function SummariesPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetchSummaries({ repoId: repoFilter || undefined, limit: LIMIT, page })
+    fetchSummaries({ repoId: repoFilter || undefined, summaryType: typeFilter || undefined, limit: LIMIT, page })
       .then((d) => { setSummaries(d.summaries); setTotal(d.total); })
       .finally(() => setLoading(false));
-  }, [repoFilter, page]);
+  }, [repoFilter, typeFilter, page]);
 
   const totalPages = Math.ceil(total / LIMIT);
 
   function handleRepoChange(e) {
     setRepoFilter(e.target.value);
+    setPage(1);
+  }
+
+  function handleTypeChange(e) {
+    setTypeFilter(e.target.value);
     setPage(1);
   }
 
@@ -62,6 +70,15 @@ export default function SummariesPage() {
             <option value="">All repositories</option>
             {repos.map(r => (
               <option key={r._id} value={r._id}>{r.name}</option>
+            ))}
+          </select>
+          <select
+            value={typeFilter}
+            onChange={handleTypeChange}
+            className="bg-gh-surface border border-gh-border text-gh-fg text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-gh-accent transition-colors cursor-pointer"
+          >
+            {TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
         </div>

@@ -8,11 +8,12 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-// GET /api/summaries?repo_id=xxx&limit=20&page=1
+// GET /api/summaries?repo_id=xxx&summary_type=daily_digest&limit=20&page=1
 router.get("/", requireAuth, async (req, res) => {
-  const { repo_id, limit = 20, page = 1 } = req.query;
+  const { repo_id, summary_type, limit = 20, page = 1 } = req.query;
   const query = { org_id: req.user.org_id._id ?? req.user.org_id };
   if (repo_id) query.repo_id = repo_id;
+  if (summary_type) query.summary_type = summary_type;
 
   const skip = (Number(page) - 1) * Number(limit);
 

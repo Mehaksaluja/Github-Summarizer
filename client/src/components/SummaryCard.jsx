@@ -3,9 +3,11 @@ import { GitCommit, GitMerge, Calendar, ArrowRight, Zap, Bug, Wrench } from "luc
 import Markdown from "react-markdown";
 
 const TYPE_META = {
-  standup:              { label: "Standup",        color: "text-gh-blue  bg-gh-blue/10  border-gh-blue/20"  },
+  standup:              { label: "Standup",        color: "text-gh-blue   bg-gh-blue/10   border-gh-blue/20"   },
   client_report:        { label: "Client Report",  color: "text-gh-accent bg-gh-accent/10 border-gh-accent/20" },
-  executive_dashboard:  { label: "Executive",      color: "text-gh-green bg-gh-green/10 border-gh-green/20" },
+  executive_dashboard:  { label: "Executive",      color: "text-gh-green  bg-gh-green/10  border-gh-green/20"  },
+  daily_digest:         { label: "Daily Digest",   color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
+  weekly_digest:        { label: "Weekly Digest",  color: "text-orange-400 bg-orange-400/10 border-orange-400/20" },
 };
 
 export default function SummaryCard({ summary, expanded = false }) {

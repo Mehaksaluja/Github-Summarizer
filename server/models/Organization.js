@@ -18,6 +18,12 @@ const organizationSchema = new mongoose.Schema(
     // Free tier gate — incremented every time a report is generated
     reports_generated: { type: Number, default: 0 },
 
+    // Digest delivery schedule
+    digest_schedule: {
+      cadence: { type: String, enum: ["per_push", "daily", "weekly"], default: "per_push" },
+      hour: { type: Number, default: 9 }, // UTC hour to deliver digest (0-23)
+    },
+
     // Outbound integration webhooks
     integrations: {
       slack_webhook_url: { type: String, default: null },

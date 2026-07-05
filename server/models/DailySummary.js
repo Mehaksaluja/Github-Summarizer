@@ -12,7 +12,7 @@ const dailySummarySchema = new mongoose.Schema(
     summary_markdown: { type: String, required: true },
     summary_type: {
       type: String,
-      enum: ["standup", "client_report", "executive_dashboard"],
+      enum: ["standup", "client_report", "executive_dashboard", "daily_digest", "weekly_digest"],
       required: true,
     },
 
