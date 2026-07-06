@@ -1,112 +1,28 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import TopBar from "../components/TopBar";
-import { User, Building2, Bell, CreditCard, Save, Calendar, Check, Loader2, Cpu, MessageSquare, Zap } from "lucide-react";
-import { fetchSettings, updateSchedule, updateIntegrations } from "../api/settings";
+import { User, Building2, Bell, CreditCard, Save, Loader2 } from "lucide-react";
+import { fetchSettings, updateIntegrations } from "../api/settings";
 import { useToast } from "../hooks/useToast";
 
 const BASE = import.meta.env.VITE_API_URL || "";
 
-const CADENCE_OPTIONS = [
-  {
-    value: "per_push",
-    label: "Per Push",
-    desc: "Summary generated on every push. Best for small teams with low commit volume.",
-  },
-  {
-    value: "daily",
-    label: "Daily Digest",
-    desc: "One rolled-up summary every morning at 9 AM UTC. Reduces noise for active repos.",
-    badge: "Recommended",
-  },
-  {
-    value: "weekly",
-    label: "Weekly Digest",
-    desc: "One summary every Monday morning. Best for managers who want a weekly overview.",
-  },
-];
-
-const MODEL_OPTIONS = [
-  {
-    value: "gpt-4o-mini",
-    label: "GPT-4o Mini",
-    tagline: "Fast & affordable",
-    desc: "Great for most teams. Processes quickly and costs less per summary.",
-    cost: "$0.001 / summary",
-  },
-  {
-    value: "gpt-4o",
-    label: "GPT-4o",
-    tagline: "Best quality",
-    desc: "More detailed and accurate summaries. Best for client reports and executive dashboards.",
-    cost: "$0.005 / summary",
-    badge: "Pro",
-  },
-];
-
-async function apiPut(path, body) {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("Save failed");
-  return res.json();
-}
-
 export default function SettingsPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const isPro = user?.org?.plan_tier !== "free";
-
-  // Digest schedule
-  const [cadence, setCadence] = useState("per_push");
-  const [originalCadence, setOriginalCadence] = useState("per_push");
-  const [scheduleSaving, setScheduleSaving] = useState(false);
-
   // Integrations
   const [slack, setSlack] = useState("");
   const [discord, setDiscord] = useState("");
   const [integrationSaving, setIntegrationSaving] = useState(false);
 
-  // AI model
-  const [model, setModel] = useState("gpt-4o-mini");
-  const [originalModel, setOriginalModel] = useState("gpt-4o-mini");
-  const [modelSaving, setModelSaving] = useState(false);
-
-  // Custom prompt
-  const [summarizerPrompt, setSummarizerPrompt] = useState("");
-  const [originalPrompt, setOriginalPrompt] = useState("");
-  const [promptSaving, setPromptSaving] = useState(false);
-
   useEffect(() => {
     fetchSettings()
       .then((data) => {
-        const c = data.digest_schedule?.cadence ?? "per_push";
-        setCadence(c);
-        setOriginalCadence(c);
         setSlack(data.integrations?.slack_webhook_url ?? "");
         setDiscord(data.integrations?.discord_webhook_url ?? "");
-        const m = data.preferred_ai_model ?? "gpt-4o-mini";
-        setModel(m);
-        setOriginalModel(m);
-        const p = data.custom_prompts?.summarizer ?? "";
-        setSummarizerPrompt(p);
-        setOriginalPrompt(p);
       })
       .catch(() => {});
   }, []);
-
-  async function saveSchedule() {
-    setScheduleSaving(true);
-    try {
-      await updateSchedule({ cadence });
-      setOriginalCadence(cadence);
-      showToast("Digest schedule saved", "success");
-    } catch { showToast("Save failed", "error"); }
-    setScheduleSaving(false);
-  }
 
   async function saveIntegrations() {
     setIntegrationSaving(true);
@@ -133,26 +49,6 @@ export default function SettingsPage() {
     } catch (err) {
       showToast(err.message || `${channel} test failed`, "error");
     }
-  }
-
-  async function saveModel() {
-    setModelSaving(true);
-    try {
-      await apiPut("/api/settings/model", { preferred_ai_model: model });
-      setOriginalModel(model);
-      showToast("AI model preference saved", "success");
-    } catch { showToast("Save failed", "error"); }
-    setModelSaving(false);
-  }
-
-  async function savePrompt() {
-    setPromptSaving(true);
-    try {
-      await apiPut("/api/settings/prompts", { summarizer: summarizerPrompt || null });
-      setOriginalPrompt(summarizerPrompt);
-      showToast("Custom prompt saved", "success");
-    } catch { showToast("Save failed", "error"); }
-    setPromptSaving(false);
   }
 
   return (
@@ -197,127 +93,6 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        {/* Digest Schedule */}
-        <Section icon={<Calendar className="w-4 h-4" />} title="Digest Schedule">
-          <p className="text-xs text-gh-subtle mb-4">
-            Choose how often GitPulse generates summaries. Daily and weekly digests batch all commits into one clean summary.
-          </p>
-          <div className="space-y-2.5">
-            {CADENCE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setCadence(opt.value)}
-                className={`w-full text-left rounded-xl border px-4 py-3.5 transition-all ${
-                  cadence === opt.value
-                    ? "border-gh-accent bg-gh-accent/5 ring-1 ring-gh-accent/20"
-                    : "border-gh-border bg-gh-surface hover:border-gh-muted/50"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${cadence === opt.value ? "border-gh-accent" : "border-gh-border"}`}>
-                      {cadence === opt.value && <div className="w-2 h-2 rounded-full bg-gh-accent" />}
-                    </div>
-                    <span className="text-sm font-semibold text-gh-fg">{opt.label}</span>
-                  </div>
-                  {opt.badge && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-gh-green/10 border-gh-green/20 text-gh-green">
-                      {opt.badge}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-gh-subtle ml-6">{opt.desc}</p>
-              </button>
-            ))}
-          </div>
-          {cadence !== "per_push" && (
-            <div className="mt-3 p-3 rounded-lg bg-gh-accent/5 border border-gh-accent/20 text-xs text-gh-accent">
-              Digests run at <strong>9:00 AM UTC</strong>.
-              {cadence === "daily" && " Yesterday's commits bundled each morning."}
-              {cadence === "weekly" && " Last 7 days bundled every Monday."}
-            </div>
-          )}
-          <div className="mt-4 flex items-center gap-3">
-            <SaveButton onClick={saveSchedule} saving={scheduleSaving} disabled={cadence === originalCadence} />
-            {cadence !== originalCadence && <span className="text-xs text-gh-subtle">Unsaved changes</span>}
-          </div>
-        </Section>
-
-        {/* AI Model */}
-        <Section icon={<Cpu className="w-4 h-4" />} title="AI Model">
-          <p className="text-xs text-gh-subtle mb-4">
-            Choose which OpenAI model generates your summaries. Better models produce richer output at higher cost.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {MODEL_OPTIONS.map((opt) => {
-              const locked = opt.badge === "Pro" && !isPro;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => !locked && setModel(opt.value)}
-                  disabled={locked}
-                  className={`text-left rounded-xl border p-4 transition-all ${
-                    model === opt.value
-                      ? "border-gh-accent bg-gh-accent/5 ring-1 ring-gh-accent/20"
-                      : locked
-                      ? "border-gh-border opacity-50 cursor-not-allowed"
-                      : "border-gh-border bg-gh-surface hover:border-gh-muted/50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div>
-                      <p className="text-sm font-semibold text-gh-fg">{opt.label}</p>
-                      <p className="text-[10px] text-gh-subtle mt-0.5">{opt.tagline}</p>
-                    </div>
-                    {opt.badge && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-gh-yellow/10 border-gh-yellow/20 text-gh-yellow shrink-0">
-                        {opt.badge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gh-subtle mb-2">{opt.desc}</p>
-                  <div className="flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-gh-muted" />
-                    <span className="text-[10px] font-mono text-gh-muted">{opt.cost}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-4 flex items-center gap-3">
-            <SaveButton onClick={saveModel} saving={modelSaving} disabled={model === originalModel} />
-            {model !== originalModel && <span className="text-xs text-gh-subtle">Unsaved changes</span>}
-          </div>
-        </Section>
-
-        {/* Custom Prompts */}
-        <Section icon={<MessageSquare className="w-4 h-4" />} title="Custom Prompt">
-          <p className="text-xs text-gh-subtle mb-4">
-            Override the default AI system prompt for summaries. Leave blank to use the default.
-            Use this to change tone (technical, client-friendly) or focus area.
-          </p>
-          <label className="block text-xs font-medium text-gh-muted mb-1.5">Summarizer system prompt</label>
-          <textarea
-            value={summarizerPrompt}
-            onChange={(e) => setSummarizerPrompt(e.target.value)}
-            placeholder={`Default: "You are a developer communication expert. Translate raw GitHub activity into clear, human-friendly summaries..."`}
-            rows={5}
-            className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2.5 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors resize-none font-mono"
-          />
-          <p className="text-[11px] text-gh-subtle mt-1.5">
-            Variables you can reference: {"{repoName}"}, {"{eventType}"}, {"{branch}"}
-          </p>
-          <div className="mt-3 flex items-center gap-3">
-            <SaveButton onClick={savePrompt} saving={promptSaving} disabled={summarizerPrompt === originalPrompt} />
-            {summarizerPrompt !== originalPrompt && <span className="text-xs text-gh-subtle">Unsaved changes</span>}
-            {summarizerPrompt && (
-              <button onClick={() => setSummarizerPrompt("")} className="text-xs text-gh-subtle hover:text-gh-red transition-colors">
-                Reset to default
-              </button>
-            )}
-          </div>
-        </Section>
-
         {/* Integrations */}
         <Section icon={<Bell className="w-4 h-4" />} title="Integrations">
           <p className="text-xs text-gh-subtle mb-4">
@@ -355,7 +130,7 @@ export default function SettingsPage() {
               <p className="text-sm font-medium text-gh-fg capitalize">{user?.org?.plan_tier} plan</p>
               <p className="text-xs text-gh-subtle mt-0.5">
                 {user?.org?.plan_tier === "free"
-                  ? "Upgrade to unlock unlimited reports, Slack, GPT-4o, and weekly digests."
+                  ? "Upgrade to unlock unlimited reports, more repos, and Slack/Discord notifications."
                   : `Subscription status: ${user?.org?.subscription_status}`}
               </p>
             </div>

@@ -3,19 +3,27 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Calendar, GitCommit, GitMerge, Zap, Bug, Wrench,
   Copy, Check, ThumbsUp, ThumbsDown, Archive, ArchiveRestore, Trash2, Loader2,
+  AlertTriangle, Users, Clock, TrendingUp, GitBranch,
 } from "lucide-react";
 import { fetchSummary, submitFeedback, archiveSummary, deleteSummary } from "../api/summaries";
 import TopBar from "../components/TopBar";
-import Markdown from "react-markdown";
 import { useToast } from "../hooks/useToast";
 
 const TYPE_META = {
-  standup:              { label: "Standup",       color: "text-gh-blue   bg-gh-blue/10   border-gh-blue/30"   },
-  client_report:        { label: "Client Report", color: "text-gh-accent bg-gh-accent/10 border-gh-accent/30" },
-  executive_dashboard:  { label: "Executive",     color: "text-gh-green  bg-gh-green/10  border-gh-green/30"  },
-  daily_digest:         { label: "Daily Digest",  color: "text-purple-400 bg-purple-400/10 border-purple-400/30" },
-  weekly_digest:        { label: "Weekly Digest", color: "text-orange-400 bg-orange-400/10 border-orange-400/30" },
+  standup:              { label: "Push Summary",   color: "text-gh-blue   bg-gh-blue/10   border-gh-blue/30"      },
+  client_report:        { label: "Client Report",  color: "text-gh-accent bg-gh-accent/10 border-gh-accent/30"    },
+  executive_dashboard:  { label: "Executive",      color: "text-gh-green  bg-gh-green/10  border-gh-green/30"     },
+  daily_digest:         { label: "Daily Digest",   color: "text-purple-400 bg-purple-400/10 border-purple-400/30" },
+  weekly_digest:        { label: "Weekly Digest",  color: "text-orange-400 bg-orange-400/10 border-orange-400/30" },
+  custom_report:        { label: "Custom Report",  color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30" },
 };
+
+function fmt(isoStr) {
+  if (!isoStr) return "";
+  return new Date(isoStr).toLocaleString("en-US", {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+  });
+}
 
 export default function SummaryDetailPage() {
   const { id } = useParams();
@@ -26,28 +34,21 @@ export default function SummaryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-
   const [rating, setRating] = useState(null);
   const [feedbackNote, setFeedbackNote] = useState("");
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [feedbackSaving, setFeedbackSaving] = useState(false);
-
   const [archived, setArchived] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
     fetchSummary(id)
-      .then((s) => {
-        setSummary(s);
-        setRating(s.feedback?.rating ?? null);
-        setArchived(s.is_archived ?? false);
-      })
-      .catch((e) => setError(e.message))
+      .then(s => { setSummary(s); setRating(s.feedback?.rating ?? null); setArchived(s.is_archived ?? false); })
+      .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
 
   async function handleCopy() {
-    if (!summary) return;
     await navigator.clipboard.writeText(summary.summary_markdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -58,11 +59,10 @@ export default function SummaryDetailPage() {
     const next = rating === r ? null : r;
     setRating(next);
     if (!next) return;
-
     setFeedbackSaving(true);
     try {
       await submitFeedback(id, { rating: next, note: feedbackNote || null });
-      showToast(next === "up" ? "Thanks for the feedback!" : "Feedback noted — we'll improve", "success");
+      showToast(next === "up" ? "Thanks for the feedback!" : "Feedback noted", "success");
       setShowNoteInput(false);
     } catch {
       setRating(rating);
@@ -79,11 +79,8 @@ export default function SummaryDetailPage() {
       await archiveSummary(id, next);
       setArchived(next);
       showToast(next ? "Summary archived" : "Summary restored", "success");
-    } catch {
-      showToast("Action failed", "error");
-    } finally {
-      setActionLoading(null);
-    }
+    } catch { showToast("Action failed", "error"); }
+    finally { setActionLoading(null); }
   }
 
   async function handleDelete() {
@@ -100,56 +97,34 @@ export default function SummaryDetailPage() {
   }
 
   const meta = summary ? (TYPE_META[summary.summary_type] ?? { label: summary.summary_type, color: "text-gh-muted bg-gh-inset border-gh-border" }) : null;
+  const s = summary?.structured;
+  const isDigest = ["daily_digest", "weekly_digest", "custom_report", "client_report", "executive_dashboard"].includes(summary?.summary_type);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-gh-canvas">
       <TopBar
         title={summary ? `${summary.date} — ${meta?.label}` : "Summary"}
         subtitle={summary?.repo_id?.full_name}
-        actions={
-          summary && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 bg-gh-surface border border-gh-border hover:border-gh-muted text-gh-muted hover:text-gh-fg text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-gh-green" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? "Copied!" : "Copy"}
-              </button>
-              <button
-                onClick={handleArchive}
-                disabled={actionLoading === "archive"}
-                title={archived ? "Restore" : "Archive"}
-                className="flex items-center gap-1.5 bg-gh-surface border border-gh-border hover:border-gh-muted text-gh-muted hover:text-gh-fg text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {actionLoading === "archive" ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : archived ? (
-                  <ArchiveRestore className="w-3.5 h-3.5" />
-                ) : (
-                  <Archive className="w-3.5 h-3.5" />
-                )}
-                {archived ? "Restore" : "Archive"}
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={actionLoading === "delete"}
-                title="Delete"
-                className="flex items-center gap-1.5 bg-gh-surface border border-gh-red/30 hover:border-gh-red text-gh-red text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {actionLoading === "delete" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Delete
-              </button>
-            </div>
-          )
-        }
+        actions={summary && (
+          <div className="flex items-center gap-2">
+            <button onClick={handleCopy} className="flex items-center gap-1.5 bg-gh-surface border border-gh-border hover:border-gh-muted text-gh-muted hover:text-gh-fg text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+              {copied ? <Check className="w-3.5 h-3.5 text-gh-green" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? "Copied!" : "Copy"}
+            </button>
+            <button onClick={handleArchive} disabled={actionLoading === "archive"} className="flex items-center gap-1.5 bg-gh-surface border border-gh-border hover:border-gh-muted text-gh-muted hover:text-gh-fg text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+              {actionLoading === "archive" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+              {archived ? "Restore" : "Archive"}
+            </button>
+            <button onClick={handleDelete} disabled={actionLoading === "delete"} className="flex items-center gap-1.5 bg-gh-surface border border-gh-red/30 hover:border-gh-red text-gh-red text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+              {actionLoading === "delete" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              Delete
+            </button>
+          </div>
+        )}
       />
 
       <div className="flex-1 p-6 max-w-3xl w-full mx-auto">
-        <Link
-          to="/app/summaries"
-          className="inline-flex items-center gap-1.5 text-xs text-gh-subtle hover:text-gh-muted mb-6 transition-colors"
-        >
+        <Link to="/app/summaries" className="inline-flex items-center gap-1.5 text-xs text-gh-subtle hover:text-gh-muted mb-6 transition-colors">
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to summaries
         </Link>
@@ -166,8 +141,7 @@ export default function SummaryDetailPage() {
         )}
 
         {summary && (
-          <div className="space-y-5">
-            {/* Archived banner */}
+          <div className="space-y-4">
             {archived && (
               <div className="flex items-center gap-3 bg-gh-inset border border-gh-border rounded-xl px-4 py-3">
                 <Archive className="w-4 h-4 text-gh-muted shrink-0" />
@@ -175,13 +149,11 @@ export default function SummaryDetailPage() {
               </div>
             )}
 
-            {/* Header card */}
+            {/* Header card — meta + stats */}
             <div className="bg-gh-surface border border-gh-border rounded-2xl p-5">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${meta.color}`}>
-                    {meta.label}
-                  </span>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${meta.color}`}>{meta.label}</span>
                   {summary.repo_id?.full_name && (
                     <span className="text-xs text-gh-subtle font-mono bg-gh-inset border border-gh-line px-2 py-0.5 rounded-full">
                       {summary.repo_id.full_name}
@@ -194,6 +166,14 @@ export default function SummaryDetailPage() {
                 </div>
               </div>
 
+              {/* Period range for digests */}
+              {isDigest && s?.since && s?.until && (
+                <div className="flex items-center gap-1.5 text-xs text-gh-muted mb-4">
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  {fmt(s.since)} → {fmt(s.until)}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <StatBox icon={<GitCommit className="w-4 h-4 text-gh-muted" />}  label="Commits"  val={summary.stats.total_commits} />
                 <StatBox icon={<GitMerge className="w-4 h-4 text-gh-muted" />}   label="PRs"      val={summary.stats.prs_merged} />
@@ -203,12 +183,150 @@ export default function SummaryDetailPage() {
               </div>
             </div>
 
-            {/* Markdown content */}
-            <div className="bg-gh-surface border border-gh-border rounded-2xl p-6">
-              <div className="dark-prose">
-                <Markdown>{summary.summary_markdown}</Markdown>
+            {s ? (
+              <>
+                {/* Headline */}
+                {s.headline && (
+                  <div className="bg-gh-surface border border-gh-border rounded-2xl px-5 py-4">
+                    <p className="text-base font-semibold text-gh-fg leading-snug">{s.headline}</p>
+                  </div>
+                )}
+
+                {/* What Changed */}
+                {s.what_changed?.length > 0 && (
+                  <SectionCard title="What Changed" icon={<TrendingUp className="w-4 h-4" />}>
+                    <ul className="space-y-2.5">
+                      {s.what_changed.map((item, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gh-accent shrink-0" />
+                          <span className="text-sm text-gh-fg leading-relaxed">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </SectionCard>
+                )}
+
+                {/* Impact */}
+                {s.why_it_matters && (
+                  <div className="bg-gh-accent/5 border border-gh-accent/20 rounded-2xl px-5 py-4">
+                    <p className="text-xs font-semibold text-gh-accent uppercase tracking-wider mb-2">Impact</p>
+                    <p className="text-sm text-gh-fg leading-relaxed">{s.why_it_matters}</p>
+                  </div>
+                )}
+
+                {/* Effort Breakdown */}
+                {(s.features?.length > 0 || s.bug_fixes?.length > 0 || s.chores?.length > 0) && (
+                  <SectionCard title="Effort Breakdown" icon={<GitBranch className="w-4 h-4" />}>
+                    <div className="space-y-3">
+                      {s.features?.length > 0 && (
+                        <EffortGroup label="Features" color="text-gh-green bg-gh-green/10 border-gh-green/20" icon="✨" items={s.features} />
+                      )}
+                      {s.bug_fixes?.length > 0 && (
+                        <EffortGroup label="Bug Fixes" color="text-gh-red bg-gh-red/10 border-gh-red/20" icon="🐛" items={s.bug_fixes} />
+                      )}
+                      {s.chores?.length > 0 && (
+                        <EffortGroup label="Chores" color="text-gh-muted bg-gh-inset border-gh-border" icon="🔧" items={s.chores} />
+                      )}
+                    </div>
+                  </SectionCard>
+                )}
+
+                {/* In Progress */}
+                {s.in_progress?.length > 0 && (
+                  <div className="bg-gh-yellow/5 border border-gh-yellow/20 rounded-2xl px-5 py-4">
+                    <p className="text-xs font-semibold text-gh-yellow uppercase tracking-wider mb-2">In Progress</p>
+                    <ul className="space-y-1.5">
+                      {s.in_progress.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gh-fg">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gh-yellow shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Blockers */}
+                {s.has_blockers && s.blockers?.length > 0 && (
+                  <div className="bg-gh-red/5 border border-gh-red/20 rounded-2xl px-5 py-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="w-4 h-4 text-gh-red" />
+                      <p className="text-xs font-semibold text-gh-red uppercase tracking-wider">
+                        Blockers
+                        {s.risk_level && s.risk_level !== "low" && (
+                          <span className="ml-2 normal-case font-medium opacity-70">· {s.risk_level} risk</span>
+                        )}
+                      </p>
+                    </div>
+                    <ul className="space-y-2 mb-3">
+                      {s.blockers.map((b, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gh-fg">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gh-red shrink-0" />
+                          {b}
+                        </li>
+                      ))}
+                    </ul>
+                    {s.blocker_recommendation && (
+                      <div className="border-t border-gh-red/20 pt-3">
+                        <p className="text-xs text-gh-muted">
+                          <span className="font-semibold text-gh-red">Recommendation:</span>{" "}
+                          {s.blocker_recommendation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Contributors (digest only) */}
+                {isDigest && s.by_author && Object.keys(s.by_author).length > 0 && (
+                  <SectionCard title="Contributors" icon={<Users className="w-4 h-4" />}>
+                    <div className="space-y-4">
+                      {Object.entries(s.by_author).map(([author, commits]) => (
+                        <div key={author}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-6 h-6 rounded-full bg-gh-accent/20 flex items-center justify-center text-[10px] font-bold text-gh-accent shrink-0">
+                              {author.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm font-semibold text-gh-fg">{author}</span>
+                            <span className="text-xs text-gh-subtle">{commits.length} commit{commits.length !== 1 ? "s" : ""}</span>
+                          </div>
+                          <ul className="space-y-1 pl-8">
+                            {commits.map((c, i) => (
+                              <li key={i} className="flex items-start gap-2 text-xs text-gh-muted">
+                                <code className="text-gh-subtle font-mono shrink-0">{c.sha}</code>
+                                <span className="leading-relaxed">{c.message}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </SectionCard>
+                )}
+
+                {/* Commits list (push summary only) */}
+                {!isDigest && s.commits?.length > 0 && (
+                  <SectionCard title="Commits" icon={<GitCommit className="w-4 h-4" />}>
+                    <ul className="space-y-2">
+                      {s.commits.map((c, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <code className="text-[11px] font-mono text-gh-subtle bg-gh-inset border border-gh-line px-1.5 py-0.5 rounded shrink-0 mt-0.5">{c.sha}</code>
+                          <div>
+                            <p className="text-sm text-gh-fg leading-snug">{c.message}</p>
+                            <p className="text-xs text-gh-subtle mt-0.5">{c.author}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </SectionCard>
+                )}
+              </>
+            ) : (
+              /* Fallback: raw markdown for old summaries without structured data */
+              <div className="bg-gh-surface border border-gh-border rounded-2xl p-6">
+                <pre className="text-xs text-gh-fg whitespace-pre-wrap font-mono leading-relaxed">{summary.summary_markdown}</pre>
               </div>
-            </div>
+            )}
 
             {/* Feedback panel */}
             <div className="bg-gh-surface border border-gh-border rounded-2xl p-5">
@@ -249,7 +367,7 @@ export default function SummaryDetailPage() {
                 <div className="mt-3">
                   <textarea
                     value={feedbackNote}
-                    onChange={(e) => setFeedbackNote(e.target.value)}
+                    onChange={e => setFeedbackNote(e.target.value)}
                     placeholder="What could be better? (optional)"
                     rows={3}
                     className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors resize-none"
@@ -263,10 +381,7 @@ export default function SummaryDetailPage() {
                       {feedbackSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       Submit feedback
                     </button>
-                    <button
-                      onClick={() => { setShowNoteInput(false); setRating(null); }}
-                      className="text-xs text-gh-subtle hover:text-gh-muted transition-colors"
-                    >
+                    <button onClick={() => { setShowNoteInput(false); setRating(null); }} className="text-xs text-gh-subtle hover:text-gh-muted transition-colors">
                       Cancel
                     </button>
                   </div>
@@ -275,22 +390,48 @@ export default function SummaryDetailPage() {
             </div>
 
             {/* Delivery status */}
-            {(summary.delivered_to?.slack || summary.delivered_to?.discord || summary.delivered_to?.email) && (
+            {(summary.delivered_to?.slack || summary.delivered_to?.discord) && (
               <div className="bg-gh-surface border border-gh-border rounded-xl px-4 py-3 flex items-center gap-3">
                 <Check className="w-4 h-4 text-gh-green shrink-0" />
                 <span className="text-xs text-gh-muted">
                   Delivered to{" "}
-                  {[
-                    summary.delivered_to.slack && "Slack",
-                    summary.delivered_to.discord && "Discord",
-                    summary.delivered_to.email && "Email",
-                  ].filter(Boolean).join(", ")}
+                  {[summary.delivered_to.slack && "Slack", summary.delivered_to.discord && "Discord"].filter(Boolean).join(", ")}
                 </span>
               </div>
             )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon, children }) {
+  return (
+    <div className="bg-gh-surface border border-gh-border rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-gh-line">
+        <span className="text-gh-muted">{icon}</span>
+        <h3 className="text-sm font-semibold text-gh-fg">{title}</h3>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </div>
+  );
+}
+
+function EffortGroup({ label, color, icon, items }) {
+  return (
+    <div>
+      <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border mb-2 ${color}`}>
+        {icon} {label}
+      </span>
+      <ul className="space-y-1 pl-1">
+        {items.map((item, i) => (
+          <li key={i} className="text-sm text-gh-fg flex items-start gap-2">
+            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gh-border shrink-0" />
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -2,35 +2,42 @@ import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const DEFAULT_SYSTEM =
-  "You are a developer communication expert. Translate raw GitHub activity into clear, human-friendly summaries for a daily standup. Be concise and specific. Never say 'the code' — name what actually changed.";
+const SYSTEM = `You are a senior engineering lead writing a concise team update from GitHub activity.
 
-export async function runSummarizerAgent({
-  eventType,
-  repoName,
-  branch,
-  commits,
-  pr,
-  model = "gpt-4o-mini",
-  customSystemPrompt = null,
-}) {
-  const context =
-    eventType === "push"
-      ? `Branch: ${branch}\n\nCommits:\n${JSON.stringify(commits, null, 2)}`
-      : `Pull Request: "${pr.title}"\n\nFiles changed:\n${JSON.stringify(pr.files, null, 2)}`;
+Rules — follow every one:
+- Be specific: name the actual feature, endpoint, component, or file changed. Never write "the code", "some changes", or "various updates".
+- Bullets must start with an action verb and name the thing: "Added POST /api/users/avatar endpoint", "Fixed null pointer crash in queue worker on empty payload"
+- Reference file paths only when they clarify the context (e.g. "Refactored auth middleware in server/routes/auth.js")
+- Headline: one tight sentence capturing the single most important change in this push
+- why_it_matters: explain real user or system impact — not a restatement of what changed
+- in_progress: only include if commit messages contain WIP, TODO, partial, draft, or files suggest an incomplete feature`;
 
-  const response = await client.chat.completions.create({
-    model,
+function buildPushContext(branch, commits) {
+  return commits.map(c => {
+    const fileLines = (c.files ?? [])
+      .map(f => `    ${f.status} ${f.filename} (+${f.additions ?? 0}/-${f.deletions ?? 0})`)
+      .join("\n");
+    return `[${c.sha}] ${c.author}: ${c.message}${fileLines ? "\n" + fileLines : ""}`;
+  }).join("\n\n");
+}
+
+export async function runSummarizerAgent({ eventType, repoName, branch, commits, pr }) {
+  const context = eventType === "push"
+    ? `Branch: ${branch}\n\n${buildPushContext(branch, commits)}`
+    : `PR: "${pr.title}"\n${pr.body ? `Description: ${pr.body.slice(0, 400)}\n` : ""}Files:\n${(pr.files ?? []).map(f => `  ${f.status} ${f.filename}`).join("\n")}`;
+
+  const res = await client.chat.completions.create({
+    model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: customSystemPrompt || DEFAULT_SYSTEM },
+      { role: "system", content: SYSTEM },
       {
         role: "user",
-        content: `Summarize this GitHub ${eventType} on repo "${repoName}".\n\n${context}\n\nRespond with JSON only:\n{\n  "headline": "one sentence summary",\n  "what_changed": ["up to 5 specific bullet points"],\n  "why_it_matters": "one sentence on impact",\n  "in_progress_signals": ["any signals suggesting work is ongoing, or empty array"]\n}`,
+        content: `Summarize this GitHub ${eventType} on "${repoName}":\n\n${context}\n\nJSON only:\n{\n  "headline": "one tight sentence — the biggest change",\n  "what_changed": ["up to 5 specific bullets, action verb + what + where"],\n  "why_it_matters": "one sentence of real user/system impact",\n  "in_progress": ["signals of unfinished work only, or empty array"]\n}`,
       },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.3,
+    temperature: 0.25,
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  return JSON.parse(res.choices[0].message.content);
 }

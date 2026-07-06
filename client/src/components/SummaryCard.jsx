@@ -1,20 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { GitCommit, GitMerge, Calendar, ArrowRight, Zap, Bug, Wrench, ThumbsUp, ThumbsDown, Archive, ArchiveRestore, Trash2, Users } from "lucide-react";
-import Markdown from "react-markdown";
+import { GitCommit, GitMerge, Calendar, ArrowRight, Zap, Bug, Wrench, ThumbsUp, ThumbsDown, Archive, ArchiveRestore, Trash2, Users, AlertTriangle } from "lucide-react";
 import { submitFeedback, archiveSummary, deleteSummary } from "../api/summaries";
 
 const TYPE_META = {
-  standup:              { label: "Standup",       color: "text-gh-blue   bg-gh-blue/10   border-gh-blue/20"   },
-  client_report:        { label: "Client Report", color: "text-gh-accent bg-gh-accent/10 border-gh-accent/20" },
-  executive_dashboard:  { label: "Executive",     color: "text-gh-green  bg-gh-green/10  border-gh-green/20"  },
-  daily_digest:         { label: "Daily Digest",  color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
-  weekly_digest:        { label: "Weekly Digest", color: "text-orange-400 bg-orange-400/10 border-orange-400/20" },
-  custom_report:        { label: "Custom Report", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
+  standup:              { label: "Push Summary",   color: "text-gh-blue   bg-gh-blue/10   border-gh-blue/20"      },
+  client_report:        { label: "Client Report",  color: "text-gh-accent bg-gh-accent/10 border-gh-accent/20"    },
+  executive_dashboard:  { label: "Executive",      color: "text-gh-green  bg-gh-green/10  border-gh-green/20"     },
+  daily_digest:         { label: "Daily Digest",   color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
+  weekly_digest:        { label: "Weekly Digest",  color: "text-orange-400 bg-orange-400/10 border-orange-400/20" },
+  custom_report:        { label: "Custom Report",  color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
 };
 
-export default function SummaryCard({ summary, expanded = false, onArchived, onDeleted }) {
-  const { _id, date, summary_type, stats, summary_markdown, repo_id } = summary;
+export default function SummaryCard({ summary, onArchived, onDeleted }) {
+  const { _id, date, summary_type, stats, structured, repo_id } = summary;
   const meta = TYPE_META[summary_type] ?? { label: summary_type, color: "text-gh-muted bg-gh-inset border-gh-border" };
 
   const [rating, setRating] = useState(summary.feedback?.rating ?? null);
@@ -52,6 +51,9 @@ export default function SummaryCard({ summary, expanded = false, onArchived, onD
     } catch { setActionLoading(null); }
   }
 
+  const bullets = structured?.what_changed?.slice(0, 3) ?? [];
+  const hasBlockers = structured?.has_blockers;
+
   return (
     <div className={`bg-gh-surface border border-gh-border rounded-xl overflow-hidden hover:border-gh-muted hover:shadow-lg hover:shadow-black/20 transition-all duration-200 ${archived ? "opacity-60" : ""}`}>
       {/* Header */}
@@ -68,6 +70,12 @@ export default function SummaryCard({ summary, expanded = false, onArchived, onD
           {repo_id?.full_name && (
             <span className="text-xs text-gh-subtle font-mono bg-gh-inset border border-gh-line px-2 py-0.5 rounded-full">
               {repo_id.full_name}
+            </span>
+          )}
+          {hasBlockers && (
+            <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-gh-red/10 border-gh-red/20 text-gh-red">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              Blockers
             </span>
           )}
         </div>
@@ -92,13 +100,22 @@ export default function SummaryCard({ summary, expanded = false, onArchived, onD
 
       <div className="h-px bg-gh-line mx-5" />
 
-      {/* Body */}
-      <div className="px-5 py-3">
-        {expanded ? (
-          <div className="dark-prose">
-            <Markdown>{summary_markdown}</Markdown>
-          </div>
-        ) : (
+      {/* Summary preview */}
+      <div className="px-5 py-3.5 space-y-2.5">
+        {structured?.headline && (
+          <p className="text-sm font-semibold text-gh-fg leading-snug">{structured.headline}</p>
+        )}
+        {bullets.length > 0 && (
+          <ul className="space-y-1">
+            {bullets.map((b, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-gh-muted">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-gh-border shrink-0" />
+                <span className="leading-relaxed">{b}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!structured?.headline && (
           <Link
             to={`/app/summaries/${_id}`}
             className="inline-flex items-center gap-1.5 text-sm text-gh-accent hover:text-gh-accent-em font-medium transition-colors"
@@ -107,11 +124,19 @@ export default function SummaryCard({ summary, expanded = false, onArchived, onD
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         )}
+        {structured?.headline && (
+          <Link
+            to={`/app/summaries/${_id}`}
+            className="inline-flex items-center gap-1 text-xs text-gh-accent hover:text-gh-accent-em font-medium transition-colors pt-0.5"
+          >
+            View full summary
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        )}
       </div>
 
       {/* Action bar */}
       <div className="px-5 pb-4 flex items-center justify-between">
-        {/* Feedback */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => handleFeedback("up")}
@@ -142,7 +167,6 @@ export default function SummaryCard({ summary, expanded = false, onArchived, onD
           )}
         </div>
 
-        {/* Archive + Delete */}
         <div className="flex items-center gap-1">
           <button
             onClick={handleArchive}
