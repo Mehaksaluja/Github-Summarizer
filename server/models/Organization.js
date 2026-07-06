@@ -39,6 +39,7 @@ const organizationSchema = new mongoose.Schema(
     // Outbound integration webhooks
     integrations: {
       slack_webhook_url: { type: String, default: null },
+      slack_channel_name: { type: String, default: null },
       discord_webhook_url: { type: String, default: null },
       email: { type: String, default: null },
     },

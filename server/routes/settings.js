@@ -40,6 +40,18 @@ router.put("/integrations", requireAuth, async (req, res) => {
   res.json({ integrations: updated.integrations });
 });
 
+// DELETE /api/settings/integrations/slack — disconnect Slack
+router.delete("/integrations/slack", requireAuth, async (req, res) => {
+  const orgId = req.user.org_id._id ?? req.user.org_id;
+  await Organization.findByIdAndUpdate(orgId, {
+    $set: {
+      "integrations.slack_webhook_url": null,
+      "integrations.slack_channel_name": null,
+    },
+  });
+  res.json({ message: "Slack disconnected" });
+});
+
 // POST /api/settings/test-notification — send a test message to verify webhook URLs
 router.post("/test-notification", requireAuth, async (req, res) => {
   const { channel } = req.body; // "slack" | "discord"

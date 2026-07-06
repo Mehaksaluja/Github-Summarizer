@@ -16,3 +16,12 @@ export async function updateIntegrations({ slack_webhook_url, discord_webhook_ur
   if (!res.ok) throw new Error("Failed to save integrations");
   return res.json();
 }
+
+export async function disconnectSlack() {
+  const res = await fetch(`${BASE}/api/settings/integrations/slack`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to disconnect Slack");
+  return res.json();
+}

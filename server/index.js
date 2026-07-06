@@ -6,6 +6,7 @@ import MongoStore from "connect-mongo";
 import passport from "./config/passport.js";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.js";
+import slackRoutes from "./routes/slack.js";
 import webhookRoutes from "./routes/webhook.js";
 import repoRoutes from "./routes/repos.js";
 import summaryRoutes from "./routes/summaries.js";
@@ -57,6 +58,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use("/auth", authRoutes);
+app.use("/auth/slack", slackRoutes);
 app.use("/webhooks", webhookRoutes);
 app.use("/api/repos", repoRoutes);
 app.use("/api/summaries", summaryRoutes);

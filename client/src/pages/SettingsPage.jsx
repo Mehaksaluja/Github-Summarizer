@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import TopBar from "../components/TopBar";
-import { User, Building2, Bell, CreditCard, Save, Loader2 } from "lucide-react";
-import { fetchSettings, updateIntegrations } from "../api/settings";
+import { User, Building2, Bell, CreditCard, Save, Loader2, CheckCircle2, XCircle, Unlink } from "lucide-react";
+import { fetchSettings, updateIntegrations, disconnectSlack } from "../api/settings";
 import { useToast } from "../hooks/useToast";
 
 const BASE = import.meta.env.VITE_API_URL || "";
@@ -10,33 +11,61 @@ const BASE = import.meta.env.VITE_API_URL || "";
 export default function SettingsPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  // Integrations
-  const [slack, setSlack] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [slackConnected, setSlackConnected] = useState(false);
+  const [slackChannel, setSlackChannel] = useState("");
   const [discord, setDiscord] = useState("");
   const [integrationSaving, setIntegrationSaving] = useState(false);
+  const [slackDisconnecting, setSlackDisconnecting] = useState(false);
+
+  // Handle redirect back from Slack OAuth
+  useEffect(() => {
+    const slackParam = searchParams.get("slack");
+    if (slackParam === "connected") {
+      showToast("Slack connected successfully!", "success");
+      setSearchParams({}, { replace: true });
+    } else if (slackParam === "error") {
+      showToast("Slack connection failed. Try again.", "error");
+      setSearchParams({}, { replace: true });
+    } else if (slackParam === "no_config") {
+      showToast("Slack app not configured on server yet.", "error");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, showToast]);
 
   useEffect(() => {
     fetchSettings()
       .then((data) => {
-        setSlack(data.integrations?.slack_webhook_url ?? "");
+        setSlackConnected(!!data.integrations?.slack_webhook_url);
+        setSlackChannel(data.integrations?.slack_channel_name ?? "");
         setDiscord(data.integrations?.discord_webhook_url ?? "");
       })
       .catch(() => {});
   }, []);
 
-  async function saveIntegrations() {
-    setIntegrationSaving(true);
+  async function handleSlackConnect() {
+    window.location.href = `${BASE}/auth/slack`;
+  }
+
+  async function handleSlackDisconnect() {
+    setSlackDisconnecting(true);
     try {
-      await updateIntegrations({ slack_webhook_url: slack, discord_webhook_url: discord });
-      showToast("Integrations saved", "success");
-    } catch { showToast("Save failed", "error"); }
-    setIntegrationSaving(false);
+      await disconnectSlack();
+      setSlackConnected(false);
+      setSlackChannel("");
+      showToast("Slack disconnected", "success");
+    } catch {
+      showToast("Failed to disconnect Slack", "error");
+    }
+    setSlackDisconnecting(false);
   }
 
   async function testNotification(channel) {
     try {
-      // Save first so the test hits the current URL
-      await updateIntegrations({ slack_webhook_url: slack, discord_webhook_url: discord });
+      if (channel === "discord") {
+        await updateIntegrations({ discord_webhook_url: discord });
+      }
       const res = await fetch(`${BASE}/api/settings/test-notification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -49,6 +78,15 @@ export default function SettingsPage() {
     } catch (err) {
       showToast(err.message || `${channel} test failed`, "error");
     }
+  }
+
+  async function saveDiscord() {
+    setIntegrationSaving(true);
+    try {
+      await updateIntegrations({ discord_webhook_url: discord });
+      showToast("Discord saved", "success");
+    } catch { showToast("Save failed", "error"); }
+    setIntegrationSaving(false);
   }
 
   return (
@@ -95,31 +133,105 @@ export default function SettingsPage() {
 
         {/* Integrations */}
         <Section icon={<Bell className="w-4 h-4" />} title="Integrations">
-          <p className="text-xs text-gh-subtle mb-4">
-            GitPulse will automatically post summaries to these channels whenever a new one is generated.
+          <p className="text-xs text-gh-subtle mb-5">
+            GitPulse posts summaries to these channels automatically on every push.
           </p>
-          <div className="space-y-5">
-            <IntegrationInput
-              label="Slack webhook URL"
-              desc='Create an Incoming Webhook in your Slack app settings, then paste the URL here.'
-              placeholder="https://hooks.slack.com/services/T.../B.../..."
-              value={slack}
-              onChange={setSlack}
-              onTest={() => testNotification("slack")}
-              canTest={!!slack}
-            />
-            <IntegrationInput
-              label="Discord webhook URL"
-              desc='In your Discord server, go to Channel Settings → Integrations → Webhooks to create one.'
-              placeholder="https://discord.com/api/webhooks/..."
-              value={discord}
-              onChange={setDiscord}
-              onTest={() => testNotification("discord")}
-              canTest={!!discord}
-            />
+
+          {/* Slack */}
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <SlackIcon />
+                <span className="text-xs font-semibold text-gh-fg">Slack</span>
+                {slackConnected && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gh-green/10 border border-gh-green/20 text-gh-green">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    Connected
+                  </span>
+                )}
+              </div>
+              {slackConnected && (
+                <button
+                  onClick={() => testNotification("slack")}
+                  className="text-xs text-gh-muted hover:text-gh-fg border border-gh-border hover:border-gh-muted px-2.5 py-1 rounded-lg transition-colors"
+                >
+                  Test
+                </button>
+              )}
+            </div>
+
+            {slackConnected ? (
+              <div className="flex items-center justify-between bg-gh-green/5 border border-gh-green/20 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-xs font-medium text-gh-fg">
+                    Posting to <span className="font-mono text-gh-green">{slackChannel || "your channel"}</span>
+                  </p>
+                  <p className="text-[10px] text-gh-subtle mt-0.5">Summaries will be delivered here on every push.</p>
+                </div>
+                <button
+                  onClick={handleSlackDisconnect}
+                  disabled={slackDisconnecting}
+                  className="flex items-center gap-1.5 text-xs text-gh-subtle hover:text-gh-red border border-gh-border hover:border-gh-red/30 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {slackDisconnecting
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <Unlink className="w-3 h-3" />
+                  }
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="text-[11px] text-gh-subtle mb-2">
+                  One click — pick a channel in Slack and you're done.
+                </p>
+                <button
+                  onClick={handleSlackConnect}
+                  className="flex items-center gap-2 bg-[#4A154B] hover:bg-[#3e1140] text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  <SlackIcon white />
+                  Add to Slack
+                </button>
+              </div>
+            )}
           </div>
-          <div className="mt-4">
-            <SaveButton onClick={saveIntegrations} saving={integrationSaving} />
+
+          <div className="h-px bg-gh-line mb-5" />
+
+          {/* Discord */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <DiscordIcon />
+              <span className="text-xs font-semibold text-gh-fg">Discord</span>
+            </div>
+            <p className="text-[11px] text-gh-subtle mb-1.5">
+              In Discord: right-click channel → Edit Channel → Integrations → Webhooks → New Webhook → Copy URL.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={discord}
+                onChange={(e) => setDiscord(e.target.value)}
+                placeholder="https://discord.com/api/webhooks/..."
+                className="flex-1 bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors font-mono"
+              />
+              <button
+                onClick={() => testNotification("discord")}
+                disabled={!discord}
+                className="shrink-0 px-3 py-2 text-xs font-medium bg-gh-surface border border-gh-border rounded-lg text-gh-muted hover:text-gh-fg hover:border-gh-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Test
+              </button>
+            </div>
+            <div className="mt-3">
+              <button
+                onClick={saveDiscord}
+                disabled={integrationSaving}
+                className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                {integrationSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {integrationSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
         </Section>
 
@@ -135,9 +247,7 @@ export default function SettingsPage() {
               </p>
             </div>
             {user?.org?.plan_tier === "free" && (
-              <button
-                className="text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white px-4 py-2 rounded-lg transition-colors shrink-0"
-              >
+              <button className="text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white px-4 py-2 rounded-lg transition-colors shrink-0">
                 Upgrade — $19/mo
               </button>
             )}
@@ -160,40 +270,27 @@ function Section({ icon, title, children }) {
   );
 }
 
-function SaveButton({ onClick, saving, disabled }) {
+function SlackIcon({ white = false }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={saving || disabled}
-      className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-    >
-      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-      {saving ? "Saving..." : "Save"}
-    </button>
+    <svg width="14" height="14" viewBox="0 0 54 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {white ? (
+        <path fill="white" d="M19.712.133a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386h5.376V5.52A5.381 5.381 0 0 0 19.712.133m0 14.365H5.376A5.381 5.381 0 0 0 0 19.884a5.381 5.381 0 0 0 5.376 5.387h14.336a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386M53.76 19.884a5.381 5.381 0 0 0-5.376-5.386 5.381 5.381 0 0 0-5.376 5.386v5.387h5.376a5.381 5.381 0 0 0 5.376-5.387m-14.336 0V5.52A5.381 5.381 0 0 0 34.048.133a5.381 5.381 0 0 0-5.376 5.387v14.364a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387M34.048 54a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386h-5.376v5.386A5.381 5.381 0 0 0 34.048 54m0-14.365h14.336a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386H34.048a5.381 5.381 0 0 0-5.376 5.386 5.381 5.381 0 0 0 5.376 5.387M0 34.248a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387v-5.386H5.376A5.381 5.381 0 0 0 0 34.248m14.336 0v14.365A5.381 5.381 0 0 0 19.712 54a5.381 5.381 0 0 0 5.376-5.387V34.248a5.381 5.381 0 0 0-5.376-5.386 5.381 5.381 0 0 0-5.376 5.386" />
+      ) : (
+        <>
+          <path fill="#E01E5A" d="M19.712.133a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386h5.376V5.52A5.381 5.381 0 0 0 19.712.133m0 14.365H5.376A5.381 5.381 0 0 0 0 19.884a5.381 5.381 0 0 0 5.376 5.387h14.336a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386" />
+          <path fill="#36C5F0" d="M53.76 19.884a5.381 5.381 0 0 0-5.376-5.386 5.381 5.381 0 0 0-5.376 5.386v5.387h5.376a5.381 5.381 0 0 0 5.376-5.387m-14.336 0V5.52A5.381 5.381 0 0 0 34.048.133a5.381 5.381 0 0 0-5.376 5.387v14.364a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387" />
+          <path fill="#2EB67D" d="M34.048 54a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386h-5.376v5.386A5.381 5.381 0 0 0 34.048 54m0-14.365h14.336a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386H34.048a5.381 5.381 0 0 0-5.376 5.386 5.381 5.381 0 0 0 5.376 5.387" />
+          <path fill="#ECB22E" d="M0 34.248a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387v-5.386H5.376A5.381 5.381 0 0 0 0 34.248m14.336 0v14.365A5.381 5.381 0 0 0 19.712 54a5.381 5.381 0 0 0 5.376-5.387V34.248a5.381 5.381 0 0 0-5.376-5.386 5.381 5.381 0 0 0-5.376 5.386" />
+        </>
+      )}
+    </svg>
   );
 }
 
-function IntegrationInput({ label, desc, placeholder, value, onChange, onTest, canTest }) {
+function DiscordIcon() {
   return (
-    <div>
-      <label className="text-xs font-medium text-gh-muted block mb-1">{label}</label>
-      <p className="text-[11px] text-gh-subtle mb-1.5">{desc}</p>
-      <div className="flex gap-2">
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="flex-1 bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors font-mono"
-        />
-        <button
-          onClick={onTest}
-          disabled={!canTest}
-          title="Send a test message"
-          className="shrink-0 px-3 py-2 text-xs font-medium bg-gh-surface border border-gh-border rounded-lg text-gh-muted hover:text-gh-fg hover:border-gh-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          Test
-        </button>
-      </div>
-    </div>
+    <svg width="14" height="14" viewBox="0 0 71 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#5865F2" d="M60.105 4.898A58.55 58.55 0 0 0 45.653.415a.22.22 0 0 0-.233.11 40.784 40.784 0 0 0-1.8 3.697c-5.456-.817-10.886-.817-16.23 0-.485-1.164-1.201-2.587-1.828-3.697a.228.228 0 0 0-.233-.11 58.386 58.386 0 0 0-14.452 4.483.207.207 0 0 0-.095.082C1.578 18.73-.944 32.144.293 45.39a.244.244 0 0 0 .093.167c6.073 4.46 11.955 7.167 17.729 8.962a.23.23 0 0 0 .249-.082 42.08 42.08 0 0 0 3.627-5.9.225.225 0 0 0-.123-.312 38.772 38.772 0 0 1-5.539-2.638.228.228 0 0 1-.022-.378 31.17 31.17 0 0 0 1.1-.862.22.22 0 0 1 .23-.031c11.62 5.304 24.198 5.304 35.68 0a.219.219 0 0 1 .232.028c.356.293.728.586 1.103.865a.228.228 0 0 1-.02.378 36.384 36.384 0 0 1-5.54 2.635.227.227 0 0 0-.121.315 47.249 47.249 0 0 0 3.624 5.897.225.225 0 0 0 .249.084c5.801-1.795 11.684-4.502 17.757-8.961a.228.228 0 0 0 .092-.164c1.48-15.315-2.48-28.618-10.497-40.412a.18.18 0 0 0-.093-.084zM23.725 37.332c-3.497 0-6.38-3.211-6.38-7.156 0-3.944 2.827-7.156 6.38-7.156 3.583 0 6.437 3.24 6.382 7.156 0 3.945-2.827 7.156-6.382 7.156zm23.593 0c-3.498 0-6.38-3.211-6.38-7.156 0-3.944 2.826-7.156 6.38-7.156 3.582 0 6.437 3.24 6.38 7.156 0 3.945-2.798 7.156-6.38 7.156z" />
+    </svg>
   );
 }
