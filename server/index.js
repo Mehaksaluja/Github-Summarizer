@@ -13,7 +13,6 @@ import settingsRoutes from "./routes/settings.js";
 import analyticsRoutes from "./routes/analytics.js";
 import webhookLogRoutes from "./routes/webhookLogs.js";
 import reportRoutes from "./routes/reports.js";
-import { startDigestScheduler } from "./services/digestScheduler.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -72,5 +71,4 @@ app.get("/health", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  startDigestScheduler();
 });

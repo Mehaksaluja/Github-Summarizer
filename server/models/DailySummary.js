@@ -32,6 +32,9 @@ const dailySummarySchema = new mongoose.Schema(
       contributors: { type: Number, default: 0 },
     },
 
+    // Structured AI output — drives the rich UI rendering
+    structured: { type: Object, default: null },
+
     // Vector embedding for future RAG ("Chat with Codebase")
     embedding: { type: [Number], default: [] },
 

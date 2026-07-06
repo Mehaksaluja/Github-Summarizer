@@ -13,8 +13,7 @@ export async function fetchCommitsByDateRange(accessToken, owner, repo, since, u
   const octokit = new Octokit({ auth: accessToken });
   try {
     const { data: commits } = await octokit.rest.repos.listCommits({
-      owner,
-      repo,
+      owner, repo,
       since: since.toISOString(),
       until: until.toISOString(),
       per_page: MAX_COMMITS,
@@ -30,7 +29,7 @@ export async function fetchCommitsByDateRange(accessToken, owner, repo, since, u
             author: c.commit.author?.name ?? "Unknown",
             author_email: c.commit.author?.email ?? null,
             timestamp: c.commit.author?.date ?? null,
-            files: (data.files ?? []).slice(0, MAX_FILES_PER_COMMIT).map((f) => ({
+            files: (data.files ?? []).slice(0, MAX_FILES_PER_COMMIT).map(f => ({
               filename: f.filename,
               status: f.status,
               additions: f.additions,
@@ -58,7 +57,7 @@ export async function fetchCommitsByDateRange(accessToken, owner, repo, since, u
   }
 }
 
-// ─── Group commits by author name ───────────────────────────────────────────
+// ─── Group commits by author ────────────────────────────────────────────────
 
 export function groupCommitsByAuthor(commits) {
   const byAuthor = {};
@@ -67,84 +66,63 @@ export function groupCommitsByAuthor(commits) {
     if (!byAuthor[name]) byAuthor[name] = [];
     byAuthor[name].push(c);
   }
-  // Sort authors by commit count desc
   return Object.fromEntries(
     Object.entries(byAuthor).sort(([, a], [, b]) => b.length - a.length)
   );
 }
 
-// ─── Rich digest markdown builder ───────────────────────────────────────────
+// ─── Markdown for Slack/Discord export ──────────────────────────────────────
 
-export function buildRichDigestMarkdown({
-  repoName, periodLabel, since, until, summary, framework, blockers, byAuthor, totalCommits, authorFilter,
-}) {
+function buildDigestMarkdown({ repoName, periodLabel, since, until, structured }) {
+  const fmt = d => d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
   const lines = [];
-  const fmt = (d) => d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
-  const authorCount = Object.keys(byAuthor).length;
-  const filterNote = authorFilter ? ` · filtered to: ${authorFilter}` : "";
 
-  lines.push(`## ${periodLabel} Digest · ${repoName}`);
-  lines.push(`*${fmt(since)} → ${fmt(until)} · ${totalCommits} commits · ${authorCount} contributor${authorCount !== 1 ? "s" : ""}${filterNote}*`);
+  lines.push(`## ${periodLabel} · ${repoName}`);
+  lines.push(`*${fmt(since)} → ${fmt(until)} · ${structured.total_commits} commits · ${structured.contributor_count} contributor${structured.contributor_count !== 1 ? "s" : ""}*`);
   lines.push("");
 
-  if (summary?.headline) {
-    lines.push(`**${summary.headline}**`);
+  if (structured.headline) {
+    lines.push(`**${structured.headline}**`);
     lines.push("");
   }
 
-  if (summary?.what_changed?.length) {
+  if (structured.what_changed?.length) {
     lines.push("### What Changed");
-    summary.what_changed.forEach((b) => lines.push(`- ${b}`));
+    structured.what_changed.forEach(b => lines.push(`- ${b}`));
     lines.push("");
   }
 
-  if (summary?.why_it_matters) {
+  if (structured.why_it_matters) {
     lines.push("### Impact");
-    lines.push(summary.why_it_matters);
+    lines.push(structured.why_it_matters);
     lines.push("");
   }
 
-  // Per-contributor section
   lines.push("---");
-  lines.push("");
   lines.push("### Contributors");
   lines.push("");
 
-  for (const [author, commits] of Object.entries(byAuthor)) {
+  for (const [author, commits] of Object.entries(structured.by_author ?? {})) {
     lines.push(`#### ${author} — ${commits.length} commit${commits.length !== 1 ? "s" : ""}`);
-    commits.forEach((c) => {
-      lines.push(`- ${c.message} \`${c.sha}\``);
-    });
-    const allFiles = [...new Set(commits.flatMap((c) => c.files?.map((f) => f.filename) ?? []))];
-    if (allFiles.length > 0) {
-      const shown = allFiles.slice(0, 10).join(", ");
-      const more = allFiles.length > 10 ? ` +${allFiles.length - 10} more` : "";
-      lines.push(`**Files touched:** ${shown}${more}`);
-    }
+    commits.forEach(c => lines.push(`- ${c.message} \`${c.sha}\``));
     lines.push("");
   }
 
-  lines.push("---");
-  lines.push("");
-
-  if (summary?.in_progress_signals?.length) {
-    lines.push("### In Progress");
-    summary.in_progress_signals.forEach((s) => lines.push(`- ${s}`));
-    lines.push("");
-  }
-
-  if (framework) {
+  if (structured.features?.length || structured.bug_fixes?.length || structured.chores?.length) {
+    lines.push("---");
     lines.push("### Effort Breakdown");
-    if (framework.features?.length) framework.features.forEach((f) => lines.push(`- ✨ ${f}`));
-    if (framework.bug_fixes?.length) framework.bug_fixes.forEach((f) => lines.push(`- 🐛 ${f}`));
-    if (framework.chores?.length) framework.chores.forEach((f) => lines.push(`- 🔧 ${f}`));
+    structured.features?.forEach(f => lines.push(`- ✨ ${f}`));
+    structured.bug_fixes?.forEach(f => lines.push(`- 🐛 ${f}`));
+    structured.chores?.forEach(f => lines.push(`- 🔧 ${f}`));
     lines.push("");
   }
 
-  if (blockers?.has_blockers) {
+  if (structured.has_blockers) {
     lines.push("### ⚠️ Blockers");
-    blockers.blockers.forEach((b) => lines.push(`- ${b}`));
-    lines.push(`> **Recommendation:** ${blockers.recommendation}`);
+    structured.blockers?.forEach(b => lines.push(`- ${b}`));
+    if (structured.blocker_recommendation) {
+      lines.push(`> **Recommendation:** ${structured.blocker_recommendation}`);
+    }
     lines.push("");
   }
 
@@ -154,15 +132,7 @@ export function buildRichDigestMarkdown({
 // ─── Main pipeline ───────────────────────────────────────────────────────────
 
 export async function generateReportForRepo({
-  accessToken,
-  org,
-  repo,
-  since,
-  until,
-  periodLabel,
-  summaryType,
-  dateKey,
-  authorFilter = null,
+  accessToken, org, repo, since, until, periodLabel, summaryType, dateKey, authorFilter = null,
 }) {
   const [owner, repoSlug] = repo.full_name.split("/");
 
@@ -175,7 +145,7 @@ export async function generateReportForRepo({
   if (authorFilter) {
     const lower = authorFilter.toLowerCase();
     commits = commits.filter(
-      (c) => c.author.toLowerCase().includes(lower) || (c.author_email ?? "").toLowerCase().includes(lower)
+      c => c.author.toLowerCase().includes(lower) || (c.author_email ?? "").toLowerCase().includes(lower)
     );
     if (commits.length === 0) {
       console.log(`[Report] No commits from author "${authorFilter}" in period — skipping`);
@@ -191,35 +161,47 @@ export async function generateReportForRepo({
     branch: repo.default_branch ?? "main",
     commits,
     pr: null,
-    model: org.preferred_ai_model || "gpt-4o-mini",
-    customSummarizerPrompt: org.custom_prompts?.summarizer || null,
   });
 
-  const markdown = buildRichDigestMarkdown({
-    repoName: repo.full_name,
-    periodLabel,
-    since,
-    until,
-    summary,
-    framework,
-    blockers,
-    byAuthor,
-    totalCommits: commits.length,
-    authorFilter,
-  });
+  const structured = {
+    headline: summary?.headline ?? null,
+    what_changed: summary?.what_changed ?? [],
+    why_it_matters: summary?.why_it_matters ?? null,
+    in_progress: summary?.in_progress ?? [],
+    features: framework?.features ?? [],
+    bug_fixes: framework?.bug_fixes ?? [],
+    chores: framework?.chores ?? [],
+    has_blockers: blockers?.has_blockers ?? false,
+    blockers: blockers?.blockers ?? [],
+    blocker_recommendation: blockers?.recommendation ?? null,
+    risk_level: blockers?.risk_level ?? "low",
+    period_label: periodLabel,
+    since: since.toISOString(),
+    until: until.toISOString(),
+    total_commits: commits.length,
+    contributor_count: Object.keys(byAuthor).length,
+    by_author: Object.fromEntries(
+      Object.entries(byAuthor).map(([name, cs]) => [
+        name,
+        cs.map(c => ({ sha: c.sha, message: c.message })),
+      ])
+    ),
+  };
+
+  const markdown = buildDigestMarkdown({ repoName: repo.full_name, periodLabel, since, until, structured });
 
   const stats = {
     total_commits: commits.length,
     contributors: Object.keys(byAuthor).length,
-    features: framework?.features?.length ?? 0,
-    bug_fixes: framework?.bug_fixes?.length ?? 0,
-    chores: framework?.chores?.length ?? 0,
+    features: structured.features.length,
+    bug_fixes: structured.bug_fixes.length,
+    chores: structured.chores.length,
     prs_merged: 0,
   };
 
   const saved = await DailySummary.findOneAndUpdate(
     { org_id: org._id, repo_id: repo._id, date: dateKey, summary_type: summaryType },
-    { $set: { summary_markdown: markdown, stats, period: { since, until } } },
+    { $set: { summary_markdown: markdown, structured, stats, period: { since, until } } },
     { upsert: true, new: true }
   );
 
@@ -230,10 +212,7 @@ export async function generateReportForRepo({
     const delivered = await deliverNotifications({ org, savedSummary: saved, summary, blockers });
     if (delivered.slack || delivered.discord) {
       await DailySummary.findByIdAndUpdate(saved._id, {
-        $set: {
-          "delivered_to.slack": delivered.slack,
-          "delivered_to.discord": delivered.discord,
-        },
+        $set: { "delivered_to.slack": delivered.slack, "delivered_to.discord": delivered.discord },
       });
     }
   }

@@ -22,21 +22,6 @@ router.get("/", requireAuth, async (req, res) => {
   });
 });
 
-// PUT /api/settings/schedule
-router.put("/schedule", requireAuth, async (req, res) => {
-  const { cadence, hour } = req.body;
-  if (!["per_push", "daily", "weekly"].includes(cadence)) {
-    return res.status(400).json({ message: "cadence must be per_push, daily, or weekly" });
-  }
-  const orgId = req.user.org_id._id ?? req.user.org_id;
-  const updated = await Organization.findByIdAndUpdate(
-    orgId,
-    { $set: { "digest_schedule.cadence": cadence, "digest_schedule.hour": hour ?? 9 } },
-    { new: true }
-  ).lean();
-  res.json({ digest_schedule: updated.digest_schedule });
-});
-
 // PUT /api/settings/integrations
 router.put("/integrations", requireAuth, async (req, res) => {
   const { slack_webhook_url, discord_webhook_url, email } = req.body;
@@ -53,21 +38,6 @@ router.put("/integrations", requireAuth, async (req, res) => {
     { new: true }
   ).lean();
   res.json({ integrations: updated.integrations });
-});
-
-// PUT /api/settings/model — AI model preference
-router.put("/model", requireAuth, async (req, res) => {
-  const { preferred_ai_model } = req.body;
-  if (!["gpt-4o-mini", "gpt-4o"].includes(preferred_ai_model)) {
-    return res.status(400).json({ message: "Invalid model" });
-  }
-  const orgId = req.user.org_id._id ?? req.user.org_id;
-  const updated = await Organization.findByIdAndUpdate(
-    orgId,
-    { $set: { preferred_ai_model } },
-    { new: true }
-  ).lean();
-  res.json({ preferred_ai_model: updated.preferred_ai_model });
 });
 
 // POST /api/settings/test-notification — send a test message to verify webhook URLs
@@ -119,18 +89,6 @@ router.post("/test-notification", requireAuth, async (req, res) => {
   } catch (err) {
     res.status(502).json({ message: `Delivery failed: ${err.message}` });
   }
-});
-
-// PUT /api/settings/prompts — custom system prompts
-router.put("/prompts", requireAuth, async (req, res) => {
-  const { summarizer } = req.body;
-  const orgId = req.user.org_id._id ?? req.user.org_id;
-  const updated = await Organization.findByIdAndUpdate(
-    orgId,
-    { $set: { "custom_prompts.summarizer": summarizer || null } },
-    { new: true }
-  ).lean();
-  res.json({ custom_prompts: updated.custom_prompts });
 });
 
 export default router;
