@@ -104,11 +104,15 @@ export async function runPipeline({ eventType, repoName, payload, org, repo }) {
     prs_merged: eventType === "pull_request" && prData?.is_merged ? 1 : 0,
   };
 
-  const saved = await DailySummary.findOneAndUpdate(
-    { org_id: org._id, repo_id: repo._id, date, summary_type: "standup" },
-    { $set: { summary_markdown: markdown, structured, stats } },
-    { upsert: true, new: true }
-  );
+  const saved = await DailySummary.create({
+    org_id: org._id,
+    repo_id: repo._id,
+    date,
+    summary_type: "standup",
+    summary_markdown: markdown,
+    structured,
+    stats,
+  });
 
   console.log(`[Pipeline] Summary saved — id: ${saved._id}`);
 
