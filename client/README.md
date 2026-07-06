@@ -1,6 +1,6 @@
-# React + Vite
+# GitPulse — Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite frontend for GitPulse. Provides a minimal setup with HMR and Oxlint rules.
 
 Currently, two official plugins are available:
 
