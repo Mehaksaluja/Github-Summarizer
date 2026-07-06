@@ -58,7 +58,7 @@ const dailySummarySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Prevent duplicate summaries for same org + repo + date + type
-dailySummarySchema.index({ org_id: 1, repo_id: 1, date: 1, summary_type: 1 }, { unique: true });
+// Index for fast lookups by org + repo + date
+dailySummarySchema.index({ org_id: 1, repo_id: 1, date: 1 });
 
 export default mongoose.model("DailySummary", dailySummarySchema);
