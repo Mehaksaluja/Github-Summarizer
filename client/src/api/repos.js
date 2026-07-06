@@ -21,3 +21,10 @@ export async function registerRepo(full_name) {
   if (!r.ok) throw new Error(data.message || "Failed to register repo");
   return data;
 }
+
+export async function removeRepo(id) {
+  const r = await fetch(`/api/repos/${id}`, { method: "DELETE", credentials: "include" });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.message || "Failed to remove repo");
+  return data;
+}

@@ -9,12 +9,11 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-// Extract the raw ObjectId whether org_id is populated or not
 function orgId(user) {
   return user.org_id._id ?? user.org_id;
 }
 
-// Register a GitHub repo for the logged-in user's org
+// Register a GitHub repo and auto-create the webhook on GitHub
 router.post("/register", requireAuth, async (req, res) => {
   const { full_name } = req.body;
   if (!full_name || !full_name.includes("/")) {
@@ -35,10 +34,34 @@ router.post("/register", requireAuth, async (req, res) => {
   const oid = orgId(req.user);
   const ghId = String(githubRepo.id);
 
-  // Check if already registered for this org
   const existing = await Repository.findOne({ github_repo_id: ghId, org_id: oid });
   if (existing) {
     return res.status(409).json({ message: "This repository is already added to your workspace." });
+  }
+
+  let webhookId = null;
+  const serverUrl = process.env.SERVER_URL;
+  if (serverUrl) {
+    try {
+      const { data: hook } = await octokit.rest.repos.createWebhook({
+        owner,
+        repo: repoSlug,
+        config: {
+          url: `${serverUrl}/webhooks/github`,
+          content_type: "json",
+          secret: process.env.GITHUB_WEBHOOK_SECRET,
+          insecure_ssl: "0",
+        },
+        events: ["push", "pull_request"],
+        active: true,
+      });
+      webhookId = String(hook.id);
+      console.log(`[Repos] Webhook created for ${full_name} — hook id: ${webhookId}`);
+    } catch (hookErr) {
+      console.warn(`[Repos] Could not auto-create webhook for ${full_name}:`, hookErr.message);
+    }
+  } else {
+    console.warn("[Repos] SERVER_URL not set — skipping auto webhook creation");
   }
 
   try {
@@ -50,12 +73,12 @@ router.post("/register", requireAuth, async (req, res) => {
       private:        githubRepo.private,
       default_branch: githubRepo.default_branch,
       webhook_secret: process.env.GITHUB_WEBHOOK_SECRET,
+      webhook_id:     webhookId,
       is_active:      true,
     });
 
-    res.json({ message: "Repo registered", repo });
+    res.json({ message: "Repo registered", repo, webhook_created: !!webhookId });
   } catch (error) {
-    // Duplicate key — another org already claimed this repo ID (unique index)
     if (error.code === 11000) {
       return res.status(409).json({ message: "This repository is already registered." });
     }
@@ -63,13 +86,13 @@ router.post("/register", requireAuth, async (req, res) => {
   }
 });
 
-// List all repos for the logged-in user's org
+// List all repos for this org
 router.get("/", requireAuth, async (req, res) => {
   const repos = await Repository.find({ org_id: orgId(req.user) });
   res.json(repos);
 });
 
-// List all GitHub repos accessible to the logged-in user (for the picker)
+// List GitHub repos accessible to the user (for the picker)
 router.get("/github", requireAuth, async (req, res) => {
   const octokit = new Octokit({ auth: req.user.access_token });
   try {
@@ -94,6 +117,29 @@ router.get("/github", requireAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+});
+
+// Remove a repo from this org and delete its GitHub webhook
+router.delete("/:id", requireAuth, async (req, res) => {
+  const oid = orgId(req.user);
+  const repo = await Repository.findOne({ _id: req.params.id, org_id: oid });
+  if (!repo) return res.status(404).json({ message: "Repository not found" });
+
+  // Delete the webhook from GitHub if we created one
+  if (repo.webhook_id) {
+    const [owner, repoSlug] = repo.full_name.split("/");
+    const octokit = new Octokit({ auth: req.user.access_token });
+    try {
+      await octokit.rest.repos.deleteWebhook({ owner, repo: repoSlug, hook_id: Number(repo.webhook_id) });
+      console.log(`[Repos] Deleted GitHub webhook ${repo.webhook_id} for ${repo.full_name}`);
+    } catch (err) {
+      // Webhook may already be gone — not a fatal error
+      console.warn(`[Repos] Could not delete webhook for ${repo.full_name}:`, err.message);
+    }
+  }
+
+  await Repository.findByIdAndDelete(repo._id);
+  res.json({ message: "Repository removed" });
 });
 
 export default router;
