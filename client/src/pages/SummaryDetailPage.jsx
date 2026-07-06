@@ -124,10 +124,13 @@ export default function SummaryDetailPage() {
       />
 
       <div className="flex-1 p-6 max-w-3xl w-full mx-auto">
-        <Link to="/app/summaries" className="inline-flex items-center gap-1.5 text-xs text-gh-subtle hover:text-gh-muted mb-6 transition-colors">
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-1.5 text-xs text-gh-subtle hover:text-gh-muted mb-6 transition-colors"
+        >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Back to summaries
-        </Link>
+          Back
+        </button>
 
         {loading && (
           <div className="space-y-4">

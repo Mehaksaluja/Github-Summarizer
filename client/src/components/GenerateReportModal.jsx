@@ -101,7 +101,17 @@ export default function GenerateReportModal({ onClose, onGenerated, preSelectedR
 
         <div className="p-6 space-y-5">
           {/* Repo selector */}
-          {!preSelectedRepoId && (
+          {!preSelectedRepoId && repos.length === 0 && (
+            <div className="px-3 py-3 bg-gh-yellow/5 border border-gh-yellow/20 rounded-lg text-xs text-gh-yellow">
+              No repositories added yet.{" "}
+              <a href="/app/repos" className="underline font-semibold hover:text-gh-fg transition-colors">
+                Add one first
+              </a>{" "}
+              to generate a report.
+            </div>
+          )}
+
+          {!preSelectedRepoId && repos.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-gh-muted mb-1.5">Repository</label>
               <select

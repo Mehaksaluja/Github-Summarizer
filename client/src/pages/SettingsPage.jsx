@@ -135,7 +135,9 @@ export default function SettingsPage() {
               </p>
             </div>
             {user?.org?.plan_tier === "free" && (
-              <button className="text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white px-4 py-2 rounded-lg transition-colors shrink-0">
+              <button
+                className="text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white px-4 py-2 rounded-lg transition-colors shrink-0"
+              >
                 Upgrade — $19/mo
               </button>
             )}

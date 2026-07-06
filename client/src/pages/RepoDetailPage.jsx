@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, FolderGit2, BarChart2 } from "lucide-react";
 import { fetchSummaries } from "../api/summaries";
+import { fetchRepos } from "../api/repos";
 import TopBar from "../components/TopBar";
 import SummaryCard from "../components/SummaryCard";
 import GenerateReportModal from "../components/GenerateReportModal";
@@ -15,17 +16,31 @@ export default function RepoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [repoName, setRepoName] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
     fetchSummaries({ repoId, limit: LIMIT, page })
-      .then((d) => { setSummaries(d.summaries); setTotal(d.total); })
+      .then((d) => {
+        setSummaries(d.summaries);
+        setTotal(d.total);
+        if (d.summaries[0]?.repo_id?.full_name) {
+          setRepoName(d.summaries[0].repo_id.full_name);
+        }
+      })
       .finally(() => setLoading(false));
   }, [repoId, page]);
 
   useEffect(() => { load(); }, [load]);
 
-  const repoName = summaries[0]?.repo_id?.full_name;
+  useEffect(() => {
+    if (repoName) return;
+    fetchRepos().then((repos) => {
+      const found = repos.find((r) => r._id === repoId);
+      if (found) setRepoName(found.full_name || found.name);
+    }).catch(() => {});
+  }, [repoId, repoName]);
+
   const totalPages = Math.ceil(total / LIMIT);
 
   return (

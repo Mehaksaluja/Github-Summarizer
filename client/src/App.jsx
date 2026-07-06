@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ToastProvider } from "./hooks/useToast";
 import Sidebar from "./components/Sidebar";
@@ -50,6 +50,16 @@ function AppRoute({ element }) {
   );
 }
 
+/* ─── Legacy redirect helpers that preserve the :id param ───────── */
+function LegacyRepoRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/app/repos/${id}`} replace />;
+}
+function LegacySummaryRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/app/summaries/${id}`} replace />;
+}
+
 /* ─── Root ───────────────────────────────────────────────────────── */
 export default function App() {
   return (
@@ -79,8 +89,8 @@ export default function App() {
 
             {/* Legacy redirects */}
             <Route path="/dashboard"       element={<Navigate to="/app/overview" replace />} />
-            <Route path="/repos/:id"       element={<Navigate to="/app/repos" replace />} />
-            <Route path="/summaries/:id"   element={<Navigate to="/app/summaries" replace />} />
+            <Route path="/repos/:id"       element={<LegacyRepoRedirect />} />
+            <Route path="/summaries/:id"   element={<LegacySummaryRedirect />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

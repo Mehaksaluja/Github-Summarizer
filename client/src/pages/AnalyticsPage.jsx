@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart2, GitCommit, GitMerge, Zap, Bug, Wrench, TrendingUp, ThumbsUp, ThumbsDown } from "lucide-react";
+import { BarChart2, GitCommit, GitMerge, Zap, Bug, TrendingUp, ThumbsUp, ThumbsDown } from "lucide-react";
 import { fetchAnalytics } from "../api/analytics";
 import { fetchRepos } from "../api/repos";
 import TopBar from "../components/TopBar";

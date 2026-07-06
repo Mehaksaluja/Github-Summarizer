@@ -103,7 +103,9 @@ export default function SummaryCard({ summary, onArchived, onDeleted }) {
       {/* Summary preview */}
       <div className="px-5 py-3.5 space-y-2.5">
         {structured?.headline && (
-          <p className="text-sm font-semibold text-gh-fg leading-snug">{structured.headline}</p>
+          <Link to={`/app/summaries/${_id}`} className="block hover:text-gh-accent transition-colors">
+            <p className="text-sm font-semibold text-gh-fg leading-snug">{structured.headline}</p>
+          </Link>
         )}
         {bullets.length > 0 && (
           <ul className="space-y-1">

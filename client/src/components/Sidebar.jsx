@@ -60,11 +60,14 @@ export default function Sidebar() {
               <span className="text-xs font-semibold text-gh-accent">Free plan</span>
             </div>
             <p className="text-[11px] text-gh-subtle leading-snug mb-2">
-              Upgrade for unlimited reports, Slack, GPT-4o, and PDF export.
+              Upgrade for unlimited reports, Slack &amp; Discord notifications, and PDF export.
             </p>
-            <button className="w-full text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white py-1.5 rounded-md transition-colors">
+            <Link
+              to="/app/settings"
+              className="block w-full text-center text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white py-1.5 rounded-md transition-colors"
+            >
               Upgrade to Pro
-            </button>
+            </Link>
           </div>
         </div>
       )}
@@ -72,7 +75,7 @@ export default function Sidebar() {
       {/* User row */}
       {user && (
         <div className="px-3 pb-3 pt-2 border-t border-gh-line">
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md group">
+          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md">
             <img
               src={user.avatar_url}
               alt=""
@@ -85,7 +88,7 @@ export default function Sidebar() {
             <button
               onClick={logout}
               title="Logout"
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-gh-subtle hover:text-gh-red"
+              className="text-gh-subtle hover:text-gh-red transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>

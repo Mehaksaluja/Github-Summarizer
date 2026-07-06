@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FolderGit2, ScrollText, GitCommit, GitMerge, ArrowRight, Plus, Sparkles } from "lucide-react";
+import { FolderGit2, ScrollText, GitCommit, GitMerge, ArrowRight, Plus, Sparkles, BarChart2 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { fetchRepos } from "../api/repos";
@@ -8,6 +8,7 @@ import { fetchSummaries } from "../api/summaries";
 import TopBar from "../components/TopBar";
 import SummaryCard from "../components/SummaryCard";
 import AddRepoModal from "../components/AddRepoModal";
+import GenerateReportModal from "../components/GenerateReportModal";
 
 export default function OverviewPage() {
   const { user } = useAuth();
@@ -18,6 +19,7 @@ export default function OverviewPage() {
   const [loadingRepos, setLoadingRepos] = useState(true);
   const [loadingSummaries, setLoadingSummaries] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const lastChecked = useRef(new Date().toISOString());
 
   useEffect(() => {
@@ -59,23 +61,32 @@ export default function OverviewPage() {
         title={`${greeting}, ${firstName} 👋`}
         subtitle={user?.org?.name}
         actions={
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 bg-gh-accent hover:bg-gh-accent-em text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Repo
-          </button>
+          <>
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="flex items-center gap-1.5 bg-gh-surface border border-gh-border hover:border-gh-muted text-gh-fg text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              Generate Report
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 bg-gh-accent hover:bg-gh-accent-em text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Repo
+            </button>
+          </>
         }
       />
 
       <div className="flex-1 p-6 space-y-6 max-w-5xl w-full mx-auto">
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={<FolderGit2 className="w-4 h-4 text-gh-accent" />} bg="bg-gh-accent/10 border-gh-accent/20" label="Repositories" value={loadingRepos ? "—" : repos.length} />
-          <StatCard icon={<ScrollText className="w-4 h-4 text-gh-blue" />}  bg="bg-gh-blue/10 border-gh-blue/20"   label="Summaries"    value={loadingSummaries ? "—" : total} />
-          <StatCard icon={<GitCommit className="w-4 h-4 text-gh-green" />}  bg="bg-gh-green/10 border-gh-green/20" label="Commits"      value={loadingSummaries ? "—" : totalCommits} />
-          <StatCard icon={<GitMerge className="w-4 h-4 text-gh-yellow" />}  bg="bg-gh-yellow/10 border-gh-yellow/20" label="PRs tracked" value={loadingSummaries ? "—" : totalPRs} />
+          <StatCard icon={<FolderGit2 className="w-4 h-4 text-gh-accent" />} bg="bg-gh-accent/10 border-gh-accent/20" label="Repositories" value={loadingRepos ? "—" : repos.length} to="/app/repos" />
+          <StatCard icon={<ScrollText className="w-4 h-4 text-gh-blue" />}  bg="bg-gh-blue/10 border-gh-blue/20"   label="Summaries"    value={loadingSummaries ? "—" : total} to="/app/summaries" />
+          <StatCard icon={<GitCommit className="w-4 h-4 text-gh-green" />}  bg="bg-gh-green/10 border-gh-green/20" label="Commits"      value={loadingSummaries ? "—" : totalCommits} to="/app/analytics" />
+          <StatCard icon={<GitMerge className="w-4 h-4 text-gh-yellow" />}  bg="bg-gh-yellow/10 border-gh-yellow/20" label="PRs tracked" value={loadingSummaries ? "—" : totalPRs} to="/app/analytics" />
         </div>
 
         <div className="grid lg:grid-cols-[1fr_320px] gap-6">
@@ -159,19 +170,29 @@ export default function OverviewPage() {
           onAdded={(r) => setRepos(p => [...p, r])}
         />
       )}
+
+      {showReportModal && (
+        <GenerateReportModal
+          onClose={() => setShowReportModal(false)}
+          onGenerated={(s) => setSummaries(prev => [s, ...prev.slice(0, 4)])}
+        />
+      )}
     </div>
   );
 }
 
-function StatCard({ icon, bg, label, value }) {
+function StatCard({ icon, bg, label, value, to }) {
   return (
-    <div className="bg-gh-surface border border-gh-border rounded-xl p-4">
+    <Link
+      to={to}
+      className="block bg-gh-surface border border-gh-border rounded-xl p-4 hover:border-gh-muted hover:bg-gh-inset transition-all group"
+    >
       <div className={`w-8 h-8 rounded-lg border flex items-center justify-center mb-3 ${bg}`}>
         {icon}
       </div>
-      <p className="text-2xl font-bold text-gh-fg tabular-nums">{value}</p>
+      <p className="text-2xl font-bold text-gh-fg tabular-nums group-hover:text-gh-accent transition-colors">{value}</p>
       <p className="text-xs text-gh-subtle mt-0.5">{label}</p>
-    </div>
+    </Link>
   );
 }
 

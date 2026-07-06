@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { GitBranch, Zap, Users, BarChart3, ArrowRight, Check, Star, GitCommit, MessageSquare, FileText } from "lucide-react";
+import { GitBranch, Zap, BarChart3, ArrowRight, Check, GitCommit, MessageSquare, FileText } from "lucide-react";
 
 /* ─── Landing page ────────────────────────────────────────────────── */
 export default function LandingPage() {
@@ -350,6 +350,7 @@ function PricingSection() {
       desc: "For agencies managing multiple clients.",
       cta: "Contact us",
       ctaStyle: "bg-gh-inset border border-gh-border hover:border-gh-muted text-gh-fg",
+      ctaHref: "#",
       features: ["Unlimited everything", "Unlimited repositories", "Up to 10 team members", "White-label reports", "Custom branding", "Priority support"],
       missing: [],
     },
@@ -386,7 +387,7 @@ function PricingSection() {
               <p className="text-xs text-gh-subtle mb-5">{p.desc}</p>
 
               <a
-                href="/auth/github"
+                href={p.ctaHref ?? "/auth/github"}
                 className={`block w-full text-center text-sm font-semibold py-2.5 rounded-xl transition-colors mb-5 ${p.ctaStyle}`}
               >
                 {p.cta}
@@ -460,10 +461,10 @@ function Footer() {
           <span className="text-xs text-gh-subtle ml-2">© 2025</span>
         </div>
         <div className="flex items-center gap-5 text-xs text-gh-subtle">
-          <a href="#" className="hover:text-gh-fg transition-colors">Privacy</a>
-          <a href="#" className="hover:text-gh-fg transition-colors">Terms</a>
-          <a href="#" className="hover:text-gh-fg transition-colors">Docs</a>
-          <a href="#" className="hover:text-gh-fg transition-colors">GitHub</a>
+          <span className="cursor-default">Privacy</span>
+          <span className="cursor-default">Terms</span>
+          <span className="cursor-default">Docs</span>
+          <span className="cursor-default">GitHub</span>
         </div>
       </div>
     </footer>
