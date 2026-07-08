@@ -2,6 +2,7 @@ import cron from "node-cron";
 import Organization from "../models/Organization.js";
 import Repository from "../models/Repository.js";
 import User from "../models/User.js";
+import { canGenerateReport } from "../config/planLimits.js";
 import { generateReportForRepo } from "./reportGenerator.js";
 
 // Build the time window [since, until] anchored to the org's configured hour
@@ -28,7 +29,12 @@ async function runDigestForCadence(cadence) {
   console.log(`[Digest] ${cadence}: found ${orgs.length} org(s)`);
 
   for (const org of orgs) {
-    const adminUser = await User.findOne({ org_id: org._id, role: "admin" });
+    if (!canGenerateReport(org)) {
+      console.log(`[Digest] Report limit reached for org ${org.slug} — skipping`);
+      continue;
+    }
+
+    const adminUser = await User.findPrimary(org._id);
     if (!adminUser) {
       console.warn(`[Digest] No admin user for org ${org.slug} — skipping`);
       continue;
@@ -43,7 +49,7 @@ async function runDigestForCadence(cadence) {
 
     for (const repo of repos) {
       try {
-        await generateReportForRepo({
+        const saved = await generateReportForRepo({
           accessToken: adminUser.access_token,
           org,
           repo,
@@ -53,6 +59,9 @@ async function runDigestForCadence(cadence) {
           summaryType,
           dateKey,
         });
+        if (saved) {
+          await Organization.findByIdAndUpdate(org._id, { $inc: { reports_generated: 1 } });
+        }
       } catch (err) {
         console.error(`[Digest] Error for ${repo.full_name}:`, err.message);
       }
@@ -61,8 +70,9 @@ async function runDigestForCadence(cadence) {
 }
 
 export function startDigestScheduler() {
-  // Daily — every 5 minutes for testing; change back to "0 9 * * *" for production
-  cron.schedule("*/5 * * * *", async () => {
+  // Override with DIGEST_CRON_DAILY in .env (default: production schedule)
+  const dailyCron = process.env.DIGEST_CRON_DAILY || "0 9 * * *";
+  cron.schedule(dailyCron, async () => {
     console.log("[Digest] Running daily digest job...");
     try {
       await runDigestForCadence("daily");
@@ -81,5 +91,5 @@ export function startDigestScheduler() {
     }
   });
 
-  console.log("[Digest] Scheduler started — daily */5 min (testing), weekly Mon 09:00 UTC");
+  console.log(`[Digest] Scheduler started — daily "${dailyCron}", weekly Mon 09:00 UTC`);
 }

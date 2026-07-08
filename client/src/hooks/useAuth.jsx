@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { apiUrl } from "../api/base";
 
 const AuthContext = createContext(null);
 
@@ -6,14 +7,14 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined = loading, null = not authed
 
   useEffect(() => {
-    fetch("/auth/me", { credentials: "include" })
+    fetch(apiUrl("/auth/me"), { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setUser(data))
       .catch(() => setUser(null));
   }, []);
 
   async function logout() {
-    await fetch("/auth/logout", { method: "POST", credentials: "include" });
+    await fetch(apiUrl("/auth/logout"), { method: "POST", credentials: "include" });
     setUser(null);
   }
 

@@ -17,6 +17,9 @@ import SummaryDetailPage from "./pages/SummaryDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import WebhooksPage from "./pages/WebhooksPage";
+import BillingPage from "./pages/BillingPage";
+import TeamPage from "./pages/TeamPage";
+import InvitePage from "./pages/InvitePage";
 
 /* ─── Auth gate ──────────────────────────────────────────────────── */
 function RequireAuth({ children }) {
@@ -85,6 +88,9 @@ export default function App() {
             <Route path="/app/summaries/:id"   element={<AppRoute element={<SummaryDetailPage />} />} />
             <Route path="/app/analytics"       element={<AppRoute element={<AnalyticsPage />} />} />
             <Route path="/app/webhooks"        element={<AppRoute element={<WebhooksPage />} />} />
+            <Route path="/invite/:token"        element={<InvitePage />} />
+            <Route path="/app/billing"         element={<AppRoute element={<BillingPage />} />} />
+            <Route path="/app/team"             element={<AppRoute element={<TeamPage />} />} />
             <Route path="/app/settings"        element={<AppRoute element={<SettingsPage />} />} />
 
             {/* Legacy redirects */}

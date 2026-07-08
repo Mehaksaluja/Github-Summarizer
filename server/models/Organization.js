@@ -14,6 +14,9 @@ const organizationSchema = new mongoose.Schema(
     },
     stripe_customer_id: { type: String, default: null },
     stripe_subscription_id: { type: String, default: null },
+    stripe_price_id: { type: String, default: null },
+    current_period_end: { type: Date, default: null },
+    cancel_at_period_end: { type: Boolean, default: false },
 
     // Free tier gate — incremented every time a report is generated
     reports_generated: { type: Number, default: 0 },
@@ -34,6 +37,12 @@ const organizationSchema = new mongoose.Schema(
     digest_schedule: {
       cadence: { type: String, enum: ["per_push", "daily", "weekly"], default: "per_push" },
       hour: { type: Number, default: 9 }, // UTC hour to deliver digest (0-23)
+    },
+
+    // Agency white-label branding for PDF exports and client reports
+    branding: {
+      report_title: { type: String, default: null },
+      footer_text: { type: String, default: null },
     },
 
     // Outbound integration webhooks

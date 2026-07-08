@@ -24,7 +24,6 @@ export async function fetchPushDetails(accessToken, owner, repo, webhookCommits)
           })),
         };
       } catch {
-        // Fall back to webhook payload file lists (no patch, but still useful)
         return {
           sha: commit.id.slice(0, 7),
           message: commit.message,

@@ -3,6 +3,7 @@ import Organization from "../models/Organization.js";
 import Repository from "../models/Repository.js";
 import User from "../models/User.js";
 import { generateReportForRepo } from "../services/reportGenerator.js";
+import { canGenerateReport } from "../config/planLimits.js";
 
 const router = express.Router();
 
@@ -30,7 +31,13 @@ router.post("/generate", requireAuth, async (req, res) => {
   if (!org) return res.status(404).json({ message: "Organization not found" });
   if (!repo) return res.status(404).json({ message: "Repository not found" });
 
-  const adminUser = await User.findOne({ org_id: orgId, role: "admin" });
+  if (!canGenerateReport(org)) {
+    return res.status(403).json({
+      message: "Report limit reached for your plan. Upgrade to generate more reports.",
+    });
+  }
+
+  const adminUser = await User.findPrimary(orgId);
   if (!adminUser) return res.status(500).json({ message: "No admin user found" });
 
   const now = new Date();
@@ -93,6 +100,8 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (!saved) {
       return res.status(404).json({ message: "No commits found in the selected period" });
     }
+
+    await Organization.findByIdAndUpdate(org._id, { $inc: { reports_generated: 1 } });
 
     res.json({ summary: saved });
   } catch (err) {

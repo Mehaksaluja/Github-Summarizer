@@ -1,6 +1,8 @@
 import express from "express";
 import { Octokit } from "@octokit/rest";
 import Repository from "../models/Repository.js";
+import Organization from "../models/Organization.js";
+import { canAddRepo } from "../config/planLimits.js";
 
 const router = express.Router();
 
@@ -18,6 +20,18 @@ router.post("/register", requireAuth, async (req, res) => {
   const { full_name } = req.body;
   if (!full_name || !full_name.includes("/")) {
     return res.status(400).json({ message: "Provide full_name in format owner/repo" });
+  }
+
+  const oidForLimitCheck = orgId(req.user);
+  const [org, currentRepoCount] = await Promise.all([
+    Organization.findById(oidForLimitCheck),
+    Repository.countDocuments({ org_id: oidForLimitCheck }),
+  ]);
+  if (!org) return res.status(404).json({ message: "Organization not found" });
+  if (!canAddRepo(org, currentRepoCount)) {
+    return res.status(403).json({
+      message: "Repository limit reached for your plan. Upgrade to add more repositories.",
+    });
   }
 
   const [owner, repoSlug] = full_name.split("/");

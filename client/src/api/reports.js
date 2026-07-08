@@ -1,5 +1,7 @@
+import { apiUrl } from "./base.js";
+
 export async function generateReport({ repoId, type, since, until, author }) {
-  const res = await fetch("/api/reports/generate", {
+  const res = await fetch(apiUrl("/api/reports/generate"), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

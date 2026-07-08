@@ -1,6 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
 import DailySummary from "../models/DailySummary.js";
+import Organization from "../models/Organization.js";
+import { hasFeature, effectivePlanTier } from "../config/planLimits.js";
+import { generateSummaryPDF } from "../services/pdfExport.js";
 
 const router = express.Router();
 
@@ -44,6 +47,36 @@ router.get("/:id", requireAuth, async (req, res) => {
 
   if (!summary) return res.status(404).json({ message: "Summary not found" });
   res.json(summary);
+});
+
+// GET /api/summaries/:id/pdf — download a summary as a PDF (Pro/Agency only)
+router.get("/:id/pdf", requireAuth, async (req, res) => {
+  const orgId = req.user.org_id._id ?? req.user.org_id;
+
+  const [org, summary] = await Promise.all([
+    Organization.findById(orgId).lean(),
+    DailySummary.findOne({ _id: req.params.id, org_id: orgId }).populate("repo_id", "name full_name").lean(),
+  ]);
+
+  if (!org) return res.status(404).json({ message: "Organization not found" });
+  if (!summary) return res.status(404).json({ message: "Summary not found" });
+  if (!hasFeature(org, "pdfExport")) {
+    return res.status(403).json({ message: "PDF export is a Pro/Agency feature. Upgrade to unlock it." });
+  }
+
+  try {
+    const brandingOrg = effectivePlanTier(org) === "agency" ? org : null;
+    const pdfBuffer = await generateSummaryPDF(summary, brandingOrg);
+    const filename = `${summary.repo_id?.name ?? "summary"}-${summary.date}.pdf`;
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    });
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error("[Summaries] PDF generation failed:", err.message);
+    res.status(500).json({ message: "Failed to generate PDF" });
+  }
 });
 
 // POST /api/summaries/:id/feedback — thumbs up/down

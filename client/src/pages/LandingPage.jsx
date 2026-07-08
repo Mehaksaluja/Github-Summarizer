@@ -35,13 +35,13 @@ function LandingNav() {
           <a href="#pricing" className="hover:text-gh-fg transition-colors">Pricing</a>
         </div>
 
-        <a
-          href="/auth/github"
+        <Link
+          to="/login"
           className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
         >
           Get started free
           <ArrowRight className="w-3.5 h-3.5" />
-        </a>
+        </Link>
       </div>
     </nav>
   );
@@ -80,15 +80,15 @@ function HeroSection() {
 
         {/* CTAs */}
         <div className="anim-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
-          <a
-            href="/auth/github"
+          <Link
+            to="/login"
             className="flex items-center gap-2.5 bg-gh-accent hover:bg-gh-accent-em text-white font-semibold px-6 py-3 rounded-xl transition-all hover:shadow-lg hover:shadow-gh-accent/20 text-sm"
           >
             <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
             </svg>
             Start for free
-          </a>
+          </Link>
           <a
             href="#how-it-works"
             className="flex items-center gap-2 text-gh-muted hover:text-gh-fg border border-gh-border hover:border-gh-muted font-medium px-6 py-3 rounded-xl transition-all text-sm"
@@ -332,14 +332,16 @@ function PricingSection() {
       desc: "For solo devs exploring GitPulse.",
       cta: "Get started",
       ctaStyle: "bg-gh-inset border border-gh-border hover:border-gh-muted text-gh-fg",
+      ctaHref: "/login",
       features: ["1 report total", "1 repository", "Manual trigger only", "Dashboard access"],
       missing: ["Slack / Discord", "PDF export", "Team members"],
     },
     {
       name: "Pro", price: "$19", period: "/month",
       desc: "For teams that ship daily.",
-      cta: "Start free trial",
+      cta: "Start with GitHub",
       ctaStyle: "bg-gh-accent hover:bg-gh-accent-em text-white",
+      ctaHref: "/login",
       highlight: true,
       badge: "Most popular",
       features: ["Unlimited reports", "Up to 10 repositories", "Auto-trigger on push", "Slack + Discord delivery", "PDF export", "All 3 report types"],
@@ -348,9 +350,9 @@ function PricingSection() {
     {
       name: "Agency", price: "$49", period: "/month",
       desc: "For agencies managing multiple clients.",
-      cta: "Contact us",
+      cta: "Get started",
       ctaStyle: "bg-gh-inset border border-gh-border hover:border-gh-muted text-gh-fg",
-      ctaHref: "#",
+      ctaHref: "/login",
       features: ["Unlimited everything", "Unlimited repositories", "Up to 10 team members", "White-label reports", "Custom branding", "Priority support"],
       missing: [],
     },
@@ -432,15 +434,15 @@ function CTASection() {
             <p className="text-gh-muted mb-8 max-w-lg mx-auto">
               Connect your GitHub in 30 seconds. No credit card required.
             </p>
-            <a
-              href="/auth/github"
+            <Link
+              to="/login"
               className="inline-flex items-center gap-2.5 bg-gh-accent hover:bg-gh-accent-em text-white font-semibold px-8 py-3.5 rounded-xl transition-all hover:shadow-xl hover:shadow-gh-accent/20 text-sm"
             >
               <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white">
                 <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
               </svg>
               Start for free with GitHub
-            </a>
+            </Link>
           </div>
         </div>
       </div>

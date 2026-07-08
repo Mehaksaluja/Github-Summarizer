@@ -1,5 +1,6 @@
 import express from "express";
 import Organization from "../models/Organization.js";
+import { hasFeature } from "../config/planLimits.js";
 
 const router = express.Router();
 
@@ -9,7 +10,13 @@ const requireAuth = (req, res, next) => {
 };
 
 // GET /auth/slack — kick off Slack OAuth
-router.get("/", requireAuth, (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
+  const orgId = req.user.org_id._id ?? req.user.org_id;
+  const org = await Organization.findById(orgId).lean();
+  if (!org || !hasFeature(org, "slackDiscord")) {
+    return res.redirect(`${process.env.CLIENT_URL}/app/settings?slack=upgrade_required`);
+  }
+
   const clientId = process.env.SLACK_CLIENT_ID;
   if (!clientId) {
     return res.redirect(`${process.env.CLIENT_URL}/app/settings?slack=no_config`);
@@ -57,6 +64,11 @@ router.get("/callback", requireAuth, async (req, res) => {
     }
 
     const orgId = req.user.org_id._id ?? req.user.org_id;
+    const org = await Organization.findById(orgId).lean();
+    if (!org || !hasFeature(org, "slackDiscord")) {
+      return res.redirect(`${process.env.CLIENT_URL}/app/settings?slack=upgrade_required`);
+    }
+
     await Organization.findByIdAndUpdate(orgId, {
       $set: {
         "integrations.slack_webhook_url": webhookUrl,

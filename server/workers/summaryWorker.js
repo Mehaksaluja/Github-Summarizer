@@ -4,15 +4,13 @@ import WebhookLog from "../models/WebhookLog.js";
 import Organization from "../models/Organization.js";
 import Repository from "../models/Repository.js";
 import { runPipeline } from "./pipeline.js";
-
-const FREE_TIER_REPORT_LIMIT = 9999; // set to 1 in production
+import { canGenerateReport } from "../config/planLimits.js";
 
 async function processJob(job) {
   const { webhookLogId, eventType, repoFullName, payload } = job.data;
 
   await WebhookLog.findByIdAndUpdate(webhookLogId, { status: "processing" });
 
-  // Resolve which org this repo belongs to
   const repo = repoFullName
     ? await Repository.findOne({ full_name: repoFullName })
     : null;
@@ -34,10 +32,9 @@ async function processJob(job) {
     });
     return;
   }
-
-  // Free tier gate — enforced here in the worker, not just at the API layer
-  if (org.plan_tier === "free" && org.reports_generated >= FREE_TIER_REPORT_LIMIT) {
-    console.log(`[Worker] Free tier limit reached for org: ${org.slug}`);
+  
+  if (!canGenerateReport(org)) {
+    console.log(`[Worker] Report limit reached for org: ${org.slug}`);
     await WebhookLog.findByIdAndUpdate(webhookLogId, { status: "skipped_limit_reached" });
     return;
   }

@@ -1,9 +1,16 @@
 import { GitBranch, Zap, Users, BarChart3 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
+import { apiUrl } from "../api/base";
+
+const ERROR_MESSAGES = {
+  invite_mismatch: "This invite was created for a different GitHub account. Sign in with the account that was invited.",
+  invite_seats_full: "This team's seat limit has been reached. Ask the admin to upgrade the plan or free up a seat.",
+};
 
 export default function LoginPage() {
   const [params] = useSearchParams();
   const error = params.get("error");
+  const errorMessage = error ? (ERROR_MESSAGES[error] || "Authentication failed. Please try again.") : null;
 
   return (
     <div className="min-h-screen bg-gh-canvas flex">
@@ -66,12 +73,12 @@ export default function LoginPage() {
 
           {error && (
             <div className="bg-gh-red/10 border border-gh-red/25 rounded-xl px-4 py-3 text-sm text-gh-red mb-6">
-              Authentication failed. Please try again.
+              {errorMessage}
             </div>
           )}
 
           <a
-            href="/auth/github"
+            href={apiUrl("/auth/github")}
             className="flex items-center justify-center gap-3 w-full bg-[#24292f] hover:bg-[#32383f] border border-[#3d444d] text-white font-semibold px-5 py-3.5 rounded-xl transition-all hover:shadow-lg hover:shadow-black/30 text-sm"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white">

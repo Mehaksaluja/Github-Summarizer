@@ -47,3 +47,20 @@ export async function deleteSummary(id) {
   if (!r.ok) throw new Error("Failed to delete summary");
   return r.json();
 }
+
+export async function downloadSummaryPdf(id, filename = "summary.pdf") {
+  const r = await fetch(`${BASE}/api/summaries/${id}/pdf`, { credentials: "include" });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to download PDF");
+  }
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

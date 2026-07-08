@@ -3,11 +3,12 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Calendar, GitCommit, GitMerge, Zap, Bug, Wrench,
   Copy, Check, ThumbsUp, ThumbsDown, Archive, ArchiveRestore, Trash2, Loader2,
-  AlertTriangle, Users, Clock, TrendingUp, GitBranch,
+  AlertTriangle, Users, Clock, TrendingUp, GitBranch, Download, Lock,
 } from "lucide-react";
-import { fetchSummary, submitFeedback, archiveSummary, deleteSummary } from "../api/summaries";
+import { fetchSummary, submitFeedback, archiveSummary, deleteSummary, downloadSummaryPdf } from "../api/summaries";
 import TopBar from "../components/TopBar";
 import { useToast } from "../hooks/useToast";
+import { useAuth } from "../hooks/useAuth";
 
 const TYPE_META = {
   standup:              { label: "Push Summary",   color: "text-gh-blue   bg-gh-blue/10   border-gh-blue/30"      },
@@ -29,6 +30,7 @@ export default function SummaryDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,21 @@ export default function SummaryDetailPage() {
   const [feedbackSaving, setFeedbackSaving] = useState(false);
   const [archived, setArchived] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const canExportPdf = ["pro", "agency"].includes(user?.org?.effective_plan_tier ?? user?.org?.plan_tier);
+
+  async function handleDownloadPdf() {
+    setPdfLoading(true);
+    try {
+      const filename = `${summary.repo_id?.name ?? "summary"}-${summary.date}.pdf`;
+      await downloadSummaryPdf(id, filename);
+    } catch (err) {
+      showToast(err.message || "Failed to download PDF", "error");
+    } finally {
+      setPdfLoading(false);
+    }
+  }
 
   useEffect(() => {
     fetchSummary(id)
@@ -111,6 +128,25 @@ export default function SummaryDetailPage() {
               {copied ? <Check className="w-3.5 h-3.5 text-gh-green" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? "Copied!" : "Copy"}
             </button>
+            {canExportPdf ? (
+              <button
+                onClick={handleDownloadPdf}
+                disabled={pdfLoading}
+                className="flex items-center gap-1.5 bg-gh-surface border border-gh-border hover:border-gh-muted text-gh-muted hover:text-gh-fg text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {pdfLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                PDF
+              </button>
+            ) : (
+              <Link
+                to="/app/billing"
+                title="Upgrade to Pro to unlock PDF export"
+                className="flex items-center gap-1.5 bg-gh-surface border border-gh-border text-gh-subtle text-xs font-medium px-3 py-1.5 rounded-lg transition-colors opacity-70 hover:opacity-100"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                PDF
+              </Link>
+            )}
             <button onClick={handleArchive} disabled={actionLoading === "archive"} className="flex items-center gap-1.5 bg-gh-surface border border-gh-border hover:border-gh-muted text-gh-muted hover:text-gh-fg text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
               {actionLoading === "archive" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
               {archived ? "Restore" : "Archive"}

@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import TopBar from "../components/TopBar";
-import { User, Building2, Bell, CreditCard, Save, Loader2, CheckCircle2, XCircle, Unlink } from "lucide-react";
-import { fetchSettings, updateIntegrations, disconnectSlack } from "../api/settings";
+import { User, Building2, Bell, CreditCard, Save, Loader2, CheckCircle2, Unlink, ArrowRight, Lock, Palette } from "lucide-react";
+import { fetchSettings, updateIntegrations, disconnectSlack, updateBranding } from "../api/settings";
 import { useToast } from "../hooks/useToast";
 
 const BASE = import.meta.env.VITE_API_URL || "";
@@ -18,6 +18,14 @@ export default function SettingsPage() {
   const [discord, setDiscord] = useState("");
   const [integrationSaving, setIntegrationSaving] = useState(false);
   const [slackDisconnecting, setSlackDisconnecting] = useState(false);
+  const [slackDiscordEnabled, setSlackDiscordEnabled] = useState(false);
+  const [whiteLabelEnabled, setWhiteLabelEnabled] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [footerText, setFooterText] = useState("");
+  const [brandingSaving, setBrandingSaving] = useState(false);
+
+  const effectiveTier = user?.org?.effective_plan_tier ?? user?.org?.plan_tier ?? "free";
+  const planLabel = { free: "Free", pro: "Pro", agency: "Agency" }[user?.org?.plan_tier] ?? "Free";
 
   // Handle redirect back from Slack OAuth
   useEffect(() => {
@@ -31,6 +39,9 @@ export default function SettingsPage() {
     } else if (slackParam === "no_config") {
       showToast("Slack app not configured on server yet.", "error");
       setSearchParams({}, { replace: true });
+    } else if (slackParam === "upgrade_required") {
+      showToast("Upgrade to Pro or Agency to connect Slack.", "error");
+      setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams, showToast]);
 
@@ -40,6 +51,10 @@ export default function SettingsPage() {
         setSlackConnected(!!data.integrations?.slack_webhook_url);
         setSlackChannel(data.integrations?.slack_channel_name ?? "");
         setDiscord(data.integrations?.discord_webhook_url ?? "");
+        setSlackDiscordEnabled(!!data.features?.slack_discord);
+        setWhiteLabelEnabled(!!data.features?.white_label);
+        setReportTitle(data.branding?.report_title ?? "");
+        setFooterText(data.branding?.footer_text ?? "");
       })
       .catch(() => {});
   }, []);
@@ -85,8 +100,21 @@ export default function SettingsPage() {
     try {
       await updateIntegrations({ discord_webhook_url: discord });
       showToast("Discord saved", "success");
-    } catch { showToast("Save failed", "error"); }
+    } catch (err) {
+      showToast(err.message || "Save failed", "error");
+    }
     setIntegrationSaving(false);
+  }
+
+  async function saveBranding() {
+    setBrandingSaving(true);
+    try {
+      await updateBranding({ report_title: reportTitle, footer_text: footerText });
+      showToast("Branding saved", "success");
+    } catch (err) {
+      showToast(err.message || "Save failed", "error");
+    }
+    setBrandingSaving(false);
   }
 
   return (
@@ -119,13 +147,16 @@ export default function SettingsPage() {
           </div>
           <div className="mt-3 flex items-center gap-3">
             <div className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-              user?.org?.plan_tier === "free"
+              effectiveTier === "free"
                 ? "bg-gh-accent/10 border-gh-accent/20 text-gh-accent"
                 : "bg-gh-green/10 border-gh-green/20 text-gh-green"
             }`}>
-              {user?.org?.plan_tier === "free" ? "Free plan" : "Pro plan"}
+              {planLabel} plan
+              {user?.org?.subscription_status === "past_due" && (
+                <span className="ml-1 text-gh-red">(payment issue)</span>
+              )}
             </div>
-            {user?.org?.plan_tier === "free" && (
+            {effectiveTier === "free" && (
               <span className="text-xs text-gh-subtle">{user?.org?.reports_generated ?? 0} / 1 reports used</span>
             )}
           </div>
@@ -136,6 +167,21 @@ export default function SettingsPage() {
           <p className="text-xs text-gh-subtle mb-5">
             GitPulse posts summaries to these channels automatically on every push.
           </p>
+
+          {!slackDiscordEnabled && (
+            <div className="mb-5 flex items-start gap-3 bg-gh-inset border border-gh-border rounded-xl p-4">
+              <Lock className="w-4 h-4 text-gh-muted mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-gh-fg">Pro or Agency required</p>
+                <p className="text-[11px] text-gh-subtle mt-0.5">
+                  Slack and Discord delivery are paid features. Upgrade to connect your channels.
+                </p>
+              </div>
+              <Link to="/app/billing" className="text-xs font-semibold text-gh-accent hover:text-gh-accent-em shrink-0">
+                Upgrade
+              </Link>
+            </div>
+          )}
 
           {/* Slack */}
           <div className="mb-5">
@@ -183,11 +229,12 @@ export default function SettingsPage() {
             ) : (
               <div>
                 <p className="text-[11px] text-gh-subtle mb-2">
-                  One click — pick a channel in Slack and you're done.
+                  One click — pick a channel in Slack and you&apos;re done.
                 </p>
                 <button
                   onClick={handleSlackConnect}
-                  className="flex items-center gap-2 bg-[#4A154B] hover:bg-[#3e1140] text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors"
+                  disabled={!slackDiscordEnabled}
+                  className="flex items-center gap-2 bg-[#4A154B] hover:bg-[#3e1140] disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors"
                 >
                   <SlackIcon white />
                   Add to Slack
@@ -211,12 +258,13 @@ export default function SettingsPage() {
               <input
                 value={discord}
                 onChange={(e) => setDiscord(e.target.value)}
+                disabled={!slackDiscordEnabled}
                 placeholder="https://discord.com/api/webhooks/..."
-                className="flex-1 bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors font-mono"
+                className="flex-1 bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-xs text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent focus:ring-1 focus:ring-gh-accent/30 transition-colors font-mono disabled:opacity-50"
               />
               <button
                 onClick={() => testNotification("discord")}
-                disabled={!discord}
+                disabled={!discord || !slackDiscordEnabled}
                 className="shrink-0 px-3 py-2 text-xs font-medium bg-gh-surface border border-gh-border rounded-lg text-gh-muted hover:text-gh-fg hover:border-gh-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Test
@@ -225,7 +273,7 @@ export default function SettingsPage() {
             <div className="mt-3">
               <button
                 onClick={saveDiscord}
-                disabled={integrationSaving}
+                disabled={integrationSaving || !slackDiscordEnabled}
                 className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
               >
                 {integrationSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -235,22 +283,61 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        {/* White-label branding (Agency) */}
+        {whiteLabelEnabled && (
+          <Section icon={<Palette className="w-4 h-4" />} title="White-label branding">
+            <p className="text-xs text-gh-subtle mb-4">
+              Customize how PDF reports appear to your clients. Leave blank to use your organization name.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gh-fg block mb-1">Report header title</label>
+                <input
+                  value={reportTitle}
+                  onChange={(e) => setReportTitle(e.target.value)}
+                  placeholder={user?.org?.name ?? "Your agency name"}
+                  className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-sm text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gh-fg block mb-1">PDF footer text</label>
+                <input
+                  value={footerText}
+                  onChange={(e) => setFooterText(e.target.value)}
+                  placeholder={`${user?.org?.name ?? "Agency"} · Confidential`}
+                  className="w-full bg-gh-canvas border border-gh-border rounded-lg px-3 py-2 text-sm text-gh-fg placeholder-gh-subtle focus:outline-none focus:border-gh-accent"
+                />
+              </div>
+              <button
+                onClick={saveBranding}
+                disabled={brandingSaving}
+                className="flex items-center gap-2 bg-gh-accent hover:bg-gh-accent-em disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                {brandingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save branding
+              </button>
+            </div>
+          </Section>
+        )}
+
         {/* Billing */}
         <Section icon={<CreditCard className="w-4 h-4" />} title="Billing">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gh-fg capitalize">{user?.org?.plan_tier} plan</p>
+              <p className="text-sm font-medium text-gh-fg capitalize">{planLabel} plan</p>
               <p className="text-xs text-gh-subtle mt-0.5">
-                {user?.org?.plan_tier === "free"
+                {effectiveTier === "free"
                   ? "Upgrade to unlock unlimited reports, more repos, and Slack/Discord notifications."
                   : `Subscription status: ${user?.org?.subscription_status}`}
               </p>
             </div>
-            {user?.org?.plan_tier === "free" && (
-              <button className="text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white px-4 py-2 rounded-lg transition-colors shrink-0">
-                Upgrade — $19/mo
-              </button>
-            )}
+            <Link
+              to="/app/billing"
+              className="flex items-center gap-1.5 text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white px-4 py-2 rounded-lg transition-colors shrink-0"
+            >
+              Manage Billing
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </Section>
       </div>

@@ -14,15 +14,28 @@ import settingsRoutes from "./routes/settings.js";
 import analyticsRoutes from "./routes/analytics.js";
 import webhookLogRoutes from "./routes/webhookLogs.js";
 import reportRoutes from "./routes/reports.js";
+import billingRoutes from "./routes/billing.js";
+import teamRoutes from "./routes/team.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isProd = process.env.NODE_ENV === "production";
+const clientOrigin = process.env.CLIENT_URL || "http://localhost:5173";
 
 connectDB();
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
+// Required behind Nginx / AWS so secure cookies and X-Forwarded-Proto work
+if (isProd) {
+  app.set("trust proxy", 1);
+}
 
-// Read raw body once from stream — needed for GitHub webhook signature verification
+app.use(
+  cors({
+    origin: clientOrigin,
+    credentials: true,
+  })
+);
+
 app.use((req, res, next) => {
   const chunks = [];
   req.on("data", (chunk) => chunks.push(chunk));
@@ -49,7 +62,9 @@ app.use(
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      // Cross-site (Vercel frontend + EC2 API) needs SameSite=None + Secure
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
     },
   })
 );
@@ -66,6 +81,8 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/webhook-logs", webhookLogRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/billing", billingRoutes);
+app.use("/api/team", teamRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

@@ -1,5 +1,5 @@
 import { NavLink, Link } from "react-router-dom";
-import { GitBranch, LayoutDashboard, FolderGit2, ScrollText, Settings, LogOut, Zap, BarChart2, Webhook } from "lucide-react";
+import { GitBranch, LayoutDashboard, FolderGit2, ScrollText, Settings, LogOut, Zap, BarChart2, Webhook, CreditCard, Users } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 const NAV = [
@@ -8,6 +8,8 @@ const NAV = [
   { to: "/app/summaries",  icon: ScrollText,       label: "Summaries" },
   { to: "/app/analytics",  icon: BarChart2,        label: "Analytics" },
   { to: "/app/webhooks",   icon: Webhook,          label: "Webhooks" },
+  { to: "/app/team",       icon: Users,            label: "Team" },
+  { to: "/app/billing",    icon: CreditCard,      label: "Billing" },
   { to: "/app/settings",   icon: Settings,         label: "Settings" },
 ];
 
@@ -52,7 +54,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Upgrade nudge — free plan only */}
-      {user?.org?.plan_tier === "free" && (
+      {user?.org?.effective_plan_tier === "free" && user?.org?.plan_tier === "free" && (
         <div className="px-3 pb-3">
           <div className="bg-gh-accent-bg border border-gh-accent/20 rounded-lg p-3">
             <div className="flex items-center gap-1.5 mb-1">
@@ -63,7 +65,7 @@ export default function Sidebar() {
               Upgrade for unlimited reports, Slack &amp; Discord notifications, and PDF export.
             </p>
             <Link
-              to="/app/settings"
+              to="/app/billing"
               className="block w-full text-center text-xs font-semibold bg-gh-accent hover:bg-gh-accent-em text-white py-1.5 rounded-md transition-colors"
             >
               Upgrade to Pro

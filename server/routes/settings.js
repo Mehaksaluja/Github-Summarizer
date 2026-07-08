@@ -1,5 +1,6 @@
 import express from "express";
 import Organization from "../models/Organization.js";
+import { hasFeature, effectivePlanTier } from "../config/planLimits.js";
 
 const router = express.Router();
 
@@ -19,6 +20,14 @@ router.get("/", requireAuth, async (req, res) => {
     custom_prompts: org.custom_prompts ?? { summarizer: null },
     digest_schedule: org.digest_schedule ?? { cadence: "per_push", hour: 9 },
     integrations: org.integrations ?? {},
+    plan_tier: org.plan_tier,
+    effective_plan_tier: effectivePlanTier(org),
+    branding: org.branding ?? { report_title: null, footer_text: null },
+    features: {
+      slack_discord: hasFeature(org, "slackDiscord"),
+      pdf_export: hasFeature(org, "pdfExport"),
+      white_label: effectivePlanTier(org) === "agency",
+    },
   });
 });
 
@@ -26,6 +35,17 @@ router.get("/", requireAuth, async (req, res) => {
 router.put("/integrations", requireAuth, async (req, res) => {
   const { slack_webhook_url, discord_webhook_url, email } = req.body;
   const orgId = req.user.org_id._id ?? req.user.org_id;
+  const org = await Organization.findById(orgId);
+  if (!org) return res.status(404).json({ message: "Organization not found" });
+
+  const connectingSlack = Boolean(slack_webhook_url);
+  const connectingDiscord = Boolean(discord_webhook_url);
+  if ((connectingSlack || connectingDiscord) && !hasFeature(org, "slackDiscord")) {
+    return res.status(403).json({
+      message: "Slack and Discord integrations require a Pro or Agency plan. Upgrade to unlock.",
+    });
+  }
+
   const updated = await Organization.findByIdAndUpdate(
     orgId,
     {
@@ -58,6 +78,12 @@ router.post("/test-notification", requireAuth, async (req, res) => {
   const orgId = req.user.org_id._id ?? req.user.org_id;
   const org = await Organization.findById(orgId).lean();
   if (!org) return res.status(404).json({ message: "Organization not found" });
+
+  if (!hasFeature(org, "slackDiscord")) {
+    return res.status(403).json({
+      message: "Slack and Discord integrations require a Pro or Agency plan.",
+    });
+  }
 
   const url =
     channel === "slack"
@@ -101,6 +127,30 @@ router.post("/test-notification", requireAuth, async (req, res) => {
   } catch (err) {
     res.status(502).json({ message: `Delivery failed: ${err.message}` });
   }
+});
+
+// PUT /api/settings/branding — Agency white-label (report title + footer on PDFs)
+router.put("/branding", requireAuth, async (req, res) => {
+  const { report_title, footer_text } = req.body;
+  const orgId = req.user.org_id._id ?? req.user.org_id;
+  const org = await Organization.findById(orgId);
+  if (!org) return res.status(404).json({ message: "Organization not found" });
+
+  if (effectivePlanTier(org) !== "agency") {
+    return res.status(403).json({ message: "White-label branding is an Agency plan feature." });
+  }
+
+  const updated = await Organization.findByIdAndUpdate(
+    orgId,
+    {
+      $set: {
+        "branding.report_title": report_title?.trim() || null,
+        "branding.footer_text": footer_text?.trim() || null,
+      },
+    },
+    { new: true }
+  ).lean();
+  res.json({ branding: updated.branding });
 });
 
 export default router;

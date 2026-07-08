@@ -9,6 +9,7 @@ import TopBar from "../components/TopBar";
 import SummaryCard from "../components/SummaryCard";
 import AddRepoModal from "../components/AddRepoModal";
 import GenerateReportModal from "../components/GenerateReportModal";
+import UpgradeBanner from "../components/UpgradeBanner";
 
 export default function OverviewPage() {
   const { user } = useAuth();
@@ -81,6 +82,11 @@ export default function OverviewPage() {
       />
 
       <div className="flex-1 p-6 space-y-6 max-w-5xl w-full mx-auto">
+        <UpgradeBanner
+          planTier={user?.org?.effective_plan_tier ?? user?.org?.plan_tier}
+          reportsGenerated={user?.org?.reports_generated ?? 0}
+        />
+
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={<FolderGit2 className="w-4 h-4 text-gh-accent" />} bg="bg-gh-accent/10 border-gh-accent/20" label="Repositories" value={loadingRepos ? "—" : repos.length} to="/app/repos" />

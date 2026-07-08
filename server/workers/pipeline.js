@@ -3,6 +3,7 @@ import DailySummary from "../models/DailySummary.js";
 import { fetchPushDetails, fetchPRDetails } from "./githubFetcher.js";
 import { runOrchestrator } from "./agents/orchestrator.js";
 import { deliverNotifications } from "../services/notificationService.js";
+import { hasFeature } from "../config/planLimits.js";
 
 function buildMarkdown({ eventType, repoName, branch, structured }) {
   const date = new Date().toISOString().split("T")[0];
@@ -56,7 +57,7 @@ function buildMarkdown({ eventType, repoName, branch, structured }) {
 }
 
 export async function runPipeline({ eventType, repoName, payload, org, repo }) {
-  const adminUser = await User.findOne({ org_id: org._id, role: "admin" });
+  const adminUser = await User.findPrimary(org._id);
   if (!adminUser) throw new Error("No admin user found for org");
 
   const [owner, repoSlug] = repoName.split("/");
@@ -116,7 +117,7 @@ export async function runPipeline({ eventType, repoName, payload, org, repo }) {
 
   console.log(`[Pipeline] Summary saved — id: ${saved._id}`);
 
-  if (org.integrations?.slack_webhook_url || org.integrations?.discord_webhook_url) {
+  if (hasFeature(org, "slackDiscord") && (org.integrations?.slack_webhook_url || org.integrations?.discord_webhook_url)) {
     saved.populated_repo_name = repoName;
     const delivered = await deliverNotifications({ org, savedSummary: saved, summary, blockers });
     if (delivered.slack || delivered.discord) {

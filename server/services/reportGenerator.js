@@ -2,12 +2,11 @@ import { Octokit } from "@octokit/rest";
 import DailySummary from "../models/DailySummary.js";
 import { runOrchestrator } from "../workers/agents/orchestrator.js";
 import { deliverNotifications } from "./notificationService.js";
+import { hasFeature } from "../config/planLimits.js";
 
 const MAX_COMMITS = 50;
 const MAX_FILES_PER_COMMIT = 12;
 const MAX_PATCH_CHARS = 500;
-
-// ─── GitHub fetching ────────────────────────────────────────────────────────
 
 export async function fetchCommitsByDateRange(accessToken, owner, repo, since, until) {
   const octokit = new Octokit({ auth: accessToken });
@@ -207,7 +206,7 @@ export async function generateReportForRepo({
 
   console.log(`[Report] Saved ${periodLabel} report for ${repo.full_name}`);
 
-  if (org.integrations?.slack_webhook_url || org.integrations?.discord_webhook_url) {
+  if (hasFeature(org, "slackDiscord") && (org.integrations?.slack_webhook_url || org.integrations?.discord_webhook_url)) {
     saved.populated_repo_name = repo.full_name;
     const delivered = await deliverNotifications({ org, savedSummary: saved, summary, blockers });
     if (delivered.slack || delivered.discord) {
