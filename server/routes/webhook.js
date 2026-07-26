@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "crypto";
 import WebhookLog from "../models/WebhookLog.js";
 import { summaryQueue } from "../queue/queues.js";
-import stripe, { handleWebhookEvent } from "../services/stripeService.js";
+import { unwrapWebhook, handleWebhookEvent } from "../services/dodoService.js";
 
 const router = express.Router();
 
@@ -18,7 +18,6 @@ const verifyGitHubSignature = (req, res, next) => {
     .update(req.rawBody)
     .digest("hex")}`;
 
-  // Timing-safe comparison prevents timing attacks
   const sigBuffer = Buffer.from(signature);
   const expBuffer = Buffer.from(expected);
 
@@ -30,14 +29,12 @@ const verifyGitHubSignature = (req, res, next) => {
 };
 
 router.post("/github", verifyGitHubSignature, async (req, res) => {
-  // Return 200 immediately — never make GitHub wait
   res.status(200).json({ message: "Received" });
 
   const eventType = req.headers["x-github-event"];
   const deliveryId = req.headers["x-github-delivery"];
   const payload = req.body;
 
-  // Only process events we care about
   const handledEvents = ["push", "pull_request", "pull_request_review"];
   if (!handledEvents.includes(eventType)) return;
 
@@ -59,13 +56,12 @@ router.post("/github", verifyGitHubSignature, async (req, res) => {
         repoFullName: payload.repository?.full_name ?? null,
         payload,
       },
-      { jobId: deliveryId } // deduplicate by GitHub delivery ID
+      { jobId: deliveryId }
     );
 
     await WebhookLog.findByIdAndUpdate(log._id, { status: "queued" });
     console.log(`[Webhook] ${eventType} queued — delivery: ${deliveryId}`);
   } catch (error) {
-    // Duplicate event_id means GitHub resent the same event — safe to ignore
     if (error.code === 11000) {
       console.log(`[Webhook] Duplicate event ignored: ${deliveryId}`);
       return;
@@ -74,46 +70,45 @@ router.post("/github", verifyGitHubSignature, async (req, res) => {
   }
 });
 
-router.post("/stripe", async (req, res) => {
+router.post("/dodo", async (req, res) => {
   let event;
   try {
-    event = stripe.webhooks.constructEvent(
-      req.rawBody,
-      req.headers["stripe-signature"],
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    event = unwrapWebhook(req.rawBody, req.headers);
   } catch (err) {
-    console.error("[Webhook] Stripe signature verification failed:", err.message);
+    console.error("[Webhook] Dodo signature verification failed:", err.message);
     return res.status(400).json({ message: `Webhook Error: ${err.message}` });
   }
 
-  // Return 200 immediately — Stripe retries on non-2xx
   res.status(200).json({ received: true });
+
+  const eventId =
+    req.headers["webhook-id"] ||
+    `${event?.business_id || "dodo"}:${event?.timestamp || Date.now()}:${event?.type}`;
 
   try {
     await WebhookLog.create({
-      event_id: event.id,
-      source: "stripe",
+      event_id: String(eventId),
+      source: "dodo",
       event_type: event.type,
       status: "received",
-      payload: event.data.object,
+      payload: event.data ?? event,
     });
   } catch (error) {
     if (error.code === 11000) {
-      console.log(`[Webhook] Duplicate Stripe event ignored: ${event.id}`);
+      console.log(`[Webhook] Duplicate Dodo event ignored: ${eventId}`);
       return;
     }
-    console.error(`[Webhook] Error logging Stripe event: ${error.message}`);
+    console.error(`[Webhook] Error logging Dodo event: ${error.message}`);
   }
 
   try {
     await handleWebhookEvent(event);
-    await WebhookLog.findOneAndUpdate({ event_id: event.id }, { status: "completed" });
-    console.log(`[Webhook] Stripe event processed: ${event.type} (${event.id})`);
+    await WebhookLog.findOneAndUpdate({ event_id: String(eventId) }, { status: "completed" });
+    console.log(`[Webhook] Dodo event processed: ${event.type} (${eventId})`);
   } catch (err) {
-    console.error(`[Webhook] Error processing Stripe event: ${err.message}`);
+    console.error(`[Webhook] Error processing Dodo event: ${err.message}`);
     await WebhookLog.findOneAndUpdate(
-      { event_id: event.id },
+      { event_id: String(eventId) },
       { status: "failed", error_message: err.message }
     );
   }

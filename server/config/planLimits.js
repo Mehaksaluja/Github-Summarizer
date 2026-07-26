@@ -22,9 +22,9 @@ export const PLAN_LIMITS = {
   },
 };
 
-export const STRIPE_PRICE_IDS = {
-  pro: process.env.STRIPE_PRICE_PRO,
-  agency: process.env.STRIPE_PRICE_AGENCY,
+export const DODO_PRODUCT_IDS = {
+  pro: process.env.DODO_PRODUCT_PRO,
+  agency: process.env.DODO_PRODUCT_AGENCY,
 };
 
 /** Paid features are revoked when subscription is past_due or cancelled. */
@@ -62,6 +62,6 @@ export function hasFeature(org, key) {
   return Boolean(limitsFor(org)[key]);
 }
 
-export function planTierForPriceId(priceId) {
-  return Object.entries(STRIPE_PRICE_IDS).find(([, id]) => id === priceId)?.[0] ?? null;
+export function planTierForProductId(productId) {
+  return Object.entries(DODO_PRODUCT_IDS).find(([, id]) => id && id === productId)?.[0] ?? null;
 }

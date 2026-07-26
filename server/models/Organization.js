@@ -12,9 +12,9 @@ const organizationSchema = new mongoose.Schema(
       enum: ["active", "past_due", "cancelled", "trialing", "none"],
       default: "none",
     },
-    stripe_customer_id: { type: String, default: null },
-    stripe_subscription_id: { type: String, default: null },
-    stripe_price_id: { type: String, default: null },
+    dodo_customer_id: { type: String, default: null },
+    dodo_subscription_id: { type: String, default: null },
+    dodo_product_id: { type: String, default: null },
     current_period_end: { type: Date, default: null },
     cancel_at_period_end: { type: Boolean, default: false },
 

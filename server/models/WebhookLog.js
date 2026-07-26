@@ -2,9 +2,9 @@ import mongoose from "mongoose";
 
 const webhookLogSchema = new mongoose.Schema(
   {
-    // Unique event ID from GitHub or Stripe — used for idempotency
+    // Unique event ID from GitHub or Dodo — used for idempotency
     event_id: { type: String, required: true, unique: true },
-    source: { type: String, enum: ["github", "stripe"], required: true },
+    source: { type: String, enum: ["github", "dodo"], required: true },
     event_type: { type: String, required: true },
 
     status: {

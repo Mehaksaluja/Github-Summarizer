@@ -50,7 +50,7 @@ export default function BillingPage() {
     if (checkout === "success") {
       showToast("Payment successful — syncing your plan...", "success");
       setSearchParams({}, { replace: true });
-      // The Stripe webhook may land a moment after this redirect — refetch shortly after.
+      // The Dodo webhook may land a moment after this redirect — refetch shortly after.
       const t = setTimeout(load, 2000);
       return () => clearTimeout(t);
     } else if (checkout === "cancelled") {

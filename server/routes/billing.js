@@ -1,7 +1,7 @@
 import express from "express";
 import Organization from "../models/Organization.js";
 import { PLAN_LIMITS } from "../config/planLimits.js";
-import { createCheckoutSession, createPortalSession } from "../services/stripeService.js";
+import { createCheckoutSession, createPortalSession } from "../services/dodoService.js";
 
 const router = express.Router();
 
@@ -28,7 +28,7 @@ router.get("/", requireAuth, async (req, res) => {
     subscription_status: org.subscription_status,
     current_period_end: org.current_period_end,
     cancel_at_period_end: org.cancel_at_period_end,
-    has_billing_account: Boolean(org.stripe_customer_id),
+    has_billing_account: Boolean(org.dodo_customer_id),
     limits: PLAN_LIMITS,
   });
 });
@@ -50,6 +50,7 @@ router.post("/checkout", requireAuth, requireAdmin, async (req, res) => {
     const url = await createCheckoutSession({
       org,
       planTier: plan_tier,
+      user: req.user,
       successUrl: `${clientUrl}/app/billing?checkout=success`,
       cancelUrl: `${clientUrl}/app/billing?checkout=cancelled`,
     });
