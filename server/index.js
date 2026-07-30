@@ -16,6 +16,8 @@ import webhookLogRoutes from "./routes/webhookLogs.js";
 import reportRoutes from "./routes/reports.js";
 import billingRoutes from "./routes/billing.js";
 import teamRoutes from "./routes/team.js";
+import { startWorker } from "./workers/summaryWorker.js";
+import { startDigestScheduler } from "./services/digestScheduler.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,6 +25,11 @@ const isProd = process.env.NODE_ENV === "production";
 const clientOrigin = process.env.CLIENT_URL || "http://localhost:5173";
 
 connectDB();
+
+// Runs the BullMQ worker + digest cron in-process so the whole app is a
+// single deployable service (no separate paid worker instance required).
+startWorker();
+startDigestScheduler();
 
 // Required behind Nginx / AWS so secure cookies and X-Forwarded-Proto work
 if (isProd) {

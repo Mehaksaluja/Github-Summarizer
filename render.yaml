@@ -1,0 +1,52 @@
+services:
+  # Express API + BullMQ worker + digest cron, all in one process
+  # (free instance type — no separate paid worker service needed)
+  - type: web
+    name: gitpulse-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DIGEST_CRON_DAILY
+        value: "0 9 * * *"
+      - key: CLIENT_URL
+        sync: false # https://your-app.vercel.app
+      - key: SERVER_URL
+        sync: false # https://gitpulse-api.onrender.com (this service's own URL)
+      - key: SESSION_SECRET
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: DODO_PAYMENTS_API_KEY
+        sync: false
+      - key: DODO_PAYMENTS_WEBHOOK_KEY
+        sync: false
+      - key: DODO_PAYMENTS_ENVIRONMENT
+        sync: false
+      - key: DODO_PRODUCT_PRO
+        sync: false
+      - key: DODO_PRODUCT_AGENCY
+        sync: false
+
+# Frontend (client/) is deployed separately on Vercel — see client/vercel.json

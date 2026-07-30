@@ -14,9 +14,9 @@ GitPulse watches your repos, turns commits and PRs into readable AI summaries, a
 |------|--------------------|
 | **Auth** | GitHub OAuth login, session cookies (7 days), logout |
 | **Repos** | Add/remove GitHub repos, auto-create/delete GitHub webhooks |
-| **Summaries** | Push/PR-triggered AI summaries via BullMQ worker + OpenAI |
+| **Summaries** | Push/PR-triggered AI summaries via BullMQ + OpenAI (runs in the API process) |
 | **On-demand reports** | Daily / weekly / custom date-range reports |
-| **Scheduled digests** | Daily & weekly cron digests (runs in the worker process) |
+| **Scheduled digests** | Daily & weekly cron digests (runs in the API process) |
 | **Slack** | OAuth “Add to Slack” + test notification + auto-delivery |
 | **Discord** | Webhook URL save + test + auto-delivery |
 | **Analytics** | Commits, features, bugs, PRs, charts, feedback counts |
@@ -35,13 +35,15 @@ GitPulse watches your repos, turns commits and PRs into readable AI summaries, a
 Checkout, customer portal, and webhooks sync `plan_tier` / subscription status via **Dodo Payments**.
 Fill `DODO_*` keys in `server/.env` and point Dodo webhooks to `${SERVER_URL}/webhooks/dodo`.
 
-### Done — deploy readiness (partial)
+### Done — deploy readiness
 
 - CORS + production cookies prepared for split frontend/API (`CLIENT_URL`, `sameSite=none` in production)
 - Client API calls use `VITE_API_URL` when set
 - GitHub OAuth callback can use full `SERVER_URL` in production
+- Single Node process (API + BullMQ worker + digest cron) — deploys as one Render free web service, no separate paid worker instance needed. See `render.yaml`.
+- Frontend deploys separately on Vercel — see `client/vercel.json` (SPA rewrite for React Router)
 
-**Not finished:** actual production deploy (Render / Railway / EC2), live payment provider setup.
+**Not finished:** live payment provider setup (Dodo keys), actually clicking deploy.
 
 ---
 
@@ -86,8 +88,7 @@ github-summary/
 │       ├── components/     # Sidebar, modals, cards
 │       └── hooks/          # useAuth, useToast
 └── server/
-    ├── index.js            # API server
-    ├── worker.js           # BullMQ worker + digest scheduler
+    ├── index.js            # API server + BullMQ worker + digest scheduler (one process)
     ├── routes/             # auth, repos, summaries, billing, team, …
     ├── services/           # dodo, pdf, notifications, digests, reports
     ├── workers/            # pipeline + AI agents
@@ -153,16 +154,13 @@ GitHub OAuth callback must be:
 ### Commands
 
 ```bash
-# Terminal 1 — API
+# Terminal 1 — API (also runs the BullMQ worker + digest cron)
 cd server && npm install && npm run dev
 
-# Terminal 2 — Worker (required for summaries)
-cd server && npm run worker:dev
-
-# Terminal 3 — Frontend
+# Terminal 2 — Frontend
 cd client && npm install && npm run dev
 
-# Terminal 4 — Public tunnel for webhooks
+# Terminal 3 — Public tunnel for webhooks
 ngrok http 5000
 ```
 
@@ -194,7 +192,7 @@ Health: **http://localhost:5000/health**
 
 1. Fill Dodo env keys + create Pro/Agency products in Dodo dashboard  
 2. Register webhook: `${SERVER_URL}/webhooks/dodo`  
-3. **Deploy** — frontend (e.g. Vercel) + backend (Render / Railway / EC2)  
+3. **Deploy** — `render.yaml` blueprint deploys the API on Render's free tier; frontend deploys separately on Vercel (root directory: `client`)  
 4. Production checklist (HTTPS URLs, OAuth callbacks, re-add repo webhooks)
 
 ---
@@ -202,6 +200,6 @@ Health: **http://localhost:5000/health**
 ## Notes for you (project owner)
 
 - Free-tier limits are enforced in code (`planLimits.js`). For local testing you can temporarily set an org’s `plan_tier` to `pro` / `agency` in MongoDB.
-- Worker **must** be running or push summaries never complete.
+- On Render's free instance type, the service spins down after 15 min idle. An incoming webhook wakes it up before the job runs, so push summaries still work (with a ~1 min cold-start delay). The digest cron only fires if the service happens to be awake at that moment — if reliable scheduled digests matter, upgrade this one service to a paid instance type later.
 - When `SERVER_URL` / ngrok changes, update OAuth callbacks and re-add repos so GitHub webhooks point at the new URL.
 - Payments use Dodo (`dodoService.js`). Without `DODO_PAYMENTS_API_KEY` / product IDs, checkout will error until you configure them.
